@@ -1,0 +1,18 @@
+**/node_modules
+**/dist
+**/.next
+
+**/Dockerfile
+.dockerignore
+.gitignore
+
+# Yarn
+.yarn
+
+# Nx
+.nx-cache
+
+# Husky
+**/.husky
+
+**/.eslintcache

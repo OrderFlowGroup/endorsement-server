@@ -1,0 +1,26 @@
+{
+  "name": "@dflow-protocol/endorsement-client-lib",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "module": "./dist/index.js",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "dev": "tsc-watch",
+    "clean": "rm -rf dist",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@dflow-protocol/signatory-client-lib": "*",
+    "zod": "^3.19.1"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^5.38.0",
+    "@typescript-eslint/parser": "^5.38.0",
+    "eslint": "^8.23.1",
+    "tsc-watch": "^5.0.3",
+    "typescript": "^4.8.3"
+  }
+}

@@ -1,0 +1,9 @@
+{
+    "endorsementKeyPath": "../../../install/dflow/ofs-1/endsMtTJP7W4cHe2szQ4DUTvW9xdtTXtBGtscgXsGsK.json",
+    "server": {
+        "port": 8082,
+        "cors": {
+            "origin": "*"
+        }
+    }
+}

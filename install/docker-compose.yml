@@ -1,0 +1,17 @@
+version: "2.1"
+services:
+  endorsement-server:
+    image: endorsement-server:latest
+    ports:
+      - 8082:8082
+    volumes:
+      - type: bind
+        source: ./dflow/ofs-1/endsMtTJP7W4cHe2szQ4DUTvW9xdtTXtBGtscgXsGsK.json
+        target: /key/flow-endorsement.json
+      - type: bind
+        source: ./endorsement-server/config.json
+        target: /config/config.json
+    command: yarn start --config /config/config.json
+    build:
+      context: ../typescript
+      dockerfile: "@dflow-protocol/endorsement-server/Dockerfile"

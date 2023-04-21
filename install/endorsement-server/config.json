@@ -1,0 +1,9 @@
+{
+    "endorsementKeyPath": "/key/flow-endorsement.json",
+    "server": {
+        "port": 8082,
+        "cors": {
+            "origin": "*"
+        }
+    }
+}
