@@ -1,0 +1,9 @@
+{
+    "endorsementKeyPath": "./endorsementKey.json",
+    "server": {
+        "port": 8082,
+        "cors": {
+            "origin": "*"
+        }
+    }
+}

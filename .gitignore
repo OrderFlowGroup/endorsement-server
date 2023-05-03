@@ -1,0 +1,7 @@
+dist
+node_modules
+
+endorsementKey.json
+
+# Nx
+.nx-cache

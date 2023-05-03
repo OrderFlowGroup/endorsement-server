@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+
+**/dev-config.json
+**/endorsementKey.json
+
+.dockerignore
+.gitignore
+
+# Yarn
+.yarn
+
+# Nx
+.nx-cache
