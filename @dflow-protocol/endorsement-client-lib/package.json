@@ -1,10 +1,14 @@
 {
   "name": "@dflow-protocol/endorsement-client-lib",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "license": "MIT",
   "module": "./dist/index.js",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": [
+    "./dist",
+    "./src"
+  ],
   "scripts": {
     "build": "rm -rf dist && tsc",
     "dev": "tsc-watch",
@@ -12,7 +16,7 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@dflow-protocol/signatory-client-lib": "0.0.17",
+    "@dflow-protocol/signatory-client-lib": "0.0.20",
     "zod": "^3.19.1"
   },
   "devDependencies": {

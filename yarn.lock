@@ -9,10 +9,10 @@
   dependencies:
     "@jridgewell/trace-mapping" "0.3.9"
 
-"@dflow-protocol/signatory-client-lib@0.0.17":
-  version "0.0.17"
-  resolved "https://registry.yarnpkg.com/@dflow-protocol/signatory-client-lib/-/signatory-client-lib-0.0.17.tgz#27c1c512e75f1ad3f9474f58970c3fd14b706b97"
-  integrity sha512-UqSf2jDDqZXbTXJHADQhmc4Gt/LaNXOQB15rKJXBHOGhJ1cl+8m5+ehrAEH2P3hgOGG8LdwOD6q4EChJDWDkcw==
+"@dflow-protocol/signatory-client-lib@0.0.20":
+  version "0.0.20"
+  resolved "https://registry.yarnpkg.com/@dflow-protocol/signatory-client-lib/-/signatory-client-lib-0.0.20.tgz#57f9253bbbda467826e62526a7f442384da13300"
+  integrity sha512-OJ5V7HBGjOgGYlZHCb8FTcKcfR/Oruo+f8MYqbg6O4WTrrNf9/rQU1ILxVn6teWJhtOPSfmAX00RMlcIMdXzcA==
   dependencies:
     zod "^3.19.1"
 
@@ -169,6 +169,11 @@
     "@types/express-serve-static-core" "^4.17.18"
     "@types/qs" "*"
     "@types/serve-static" "*"
+
+"@types/js-yaml@^4.0.5":
+  version "4.0.5"
+  resolved "https://registry.yarnpkg.com/@types/js-yaml/-/js-yaml-4.0.5.tgz#738dd390a6ecc5442f35e7f03fa1431353f7e138"
+  integrity sha512-FhpRzf927MNQdRZP0J5DLIdTXhjLYzeUTmLAu69mnVksLH9CJY3IuSeEgbKUki7GQZm0WqDkGzyxju2EZGD2wA==
 
 "@types/json-schema@^7.0.9":
   version "7.0.11"

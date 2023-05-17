@@ -7,6 +7,7 @@ import http from "http";
 import StatusCodes from "http-status-codes";
 import morgan from "morgan";
 import { EndorsementServerContext } from "./context";
+import { CustomError } from "./error";
 import { EndorsementAPIRouter } from "./router";
 
 export class EndorsementServer {
@@ -32,7 +33,9 @@ export class EndorsementServer {
 
         this.app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
             context.logger.error(err);
-            const status = StatusCodes.BAD_REQUEST;
+            const status = err instanceof CustomError
+                ? err.HttpStatus
+                : StatusCodes.INTERNAL_SERVER_ERROR;
             return res.status(status).json({
                 error: err.message,
             });

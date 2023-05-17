@@ -1,7 +1,7 @@
 **/node_modules
 **/dist
 
-**/dev-config.json
+**/dev-config.yaml
 **/endorsementKey.json
 
 .dockerignore

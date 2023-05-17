@@ -1,12 +1,16 @@
-import { EndorsementRequest } from "@dflow-protocol/endorsement-client-lib";
+import {
+    EndorsementRequest,
+    PaymentInLieuApprovalRequest,
+} from "@dflow-protocol/endorsement-client-lib";
+import { makePaymentInLieuMessage } from "@dflow-protocol/signatory-client-lib";
 import bs58 from "bs58";
 import { randomBytes } from "crypto";
 import nacl from "tweetnacl";
 
-export type EndorseResult = ApprovedResult | RejectedResult
+export type EndorseResult = EndorsedResult | NotEndorsedResult
 
-export type ApprovedResult = {
-    approved: true
+export type EndorsedResult = {
+    endorsed: true
     endorsement: {
         signature: string
         id: string
@@ -14,13 +18,30 @@ export type ApprovedResult = {
     }
 }
 
-export type RejectedResult = {
-    approved: false
-    reason: RejectReason
+export type NotEndorsedResult = {
+    endorsed: false
+    reason: NotEndorsedReason
 }
 
-export enum RejectReason {
+export enum NotEndorsedReason {
     RateLimitExceeded = 1,
+}
+
+export type ApprovePaymentInLieuResult = PaymentInLieuApprovedResult | PaymentInLieuRejectedResult
+
+export type PaymentInLieuApprovedResult = {
+    approved: true
+    approval: string
+}
+
+export type PaymentInLieuRejectedResult = {
+    approved: false
+    reason: PaymentInLieuRejectedReason
+}
+
+export enum PaymentInLieuRejectedReason {
+    EndorsementExpired = 1,
+    RateLimitExceeded = 2,
 }
 
 export class RequestEndorser {
@@ -34,9 +55,8 @@ export class RequestEndorser {
         this.expirationInSeconds = expirationInSeconds;
     }
 
-    async maybeEndorse(request: EndorsementRequest): Promise<EndorseResult> {
+    async maybeEndorse(request: EndorsementRequest, now: Date): Promise<EndorseResult> {
         const id = randomBytes(8).toString("base64");
-        const now = new Date();
         const nowUTCSeconds = Math.floor(now.getTime() / 1000);
         const expirationTimeUTC = nowUTCSeconds + this.expirationInSeconds;
         const msg = request.retailTrader === undefined
@@ -46,12 +66,42 @@ export class RequestEndorser {
         const signatureBuffer = nacl.sign.detached(msgBuffer, this.keypair.secretKey);
         const signature = Buffer.from(signatureBuffer).toString("base64");
         return {
-            approved: true,
+            endorsed: true,
             endorsement: {
                 signature,
                 id,
                 expirationTimeUTC,
             },
+        };
+    }
+
+    async maybeApprovePaymentInLieu(
+        request: PaymentInLieuApprovalRequest,
+        now: Date,
+    ): Promise<ApprovePaymentInLieuResult> {
+        const paymentInLieuToken = request.paymentInLieuToken;
+
+        // Check that endorsement is not expired
+        const endorsement = paymentInLieuToken.endorsement;
+        const nowUTCSeconds = Math.floor(now.getTime() / 1000);
+        const expirationTimeUTCSeconds = endorsement.expirationTimeUTC;
+        if (nowUTCSeconds >= expirationTimeUTCSeconds) {
+            return { approved: false, reason: PaymentInLieuRejectedReason.EndorsementExpired };
+        }
+
+        // Note that we don't verify DFlow node's signature of the payment in lieu token. The DFlow
+        // node will not accept the approval if the token was tampered with.
+
+        const approvalMessage = paymentInLieuToken.signature;
+        const approvalMessageBuffer = Buffer.from(approvalMessage, "utf-8");
+        const approvalSignatureBuffer = nacl.sign.detached(
+            approvalMessageBuffer,
+            this.keypair.secretKey,
+        );
+        const approvalSignature = Buffer.from(approvalSignatureBuffer).toString("base64");
+        return {
+            approved: true,
+            approval: approvalSignature,
         };
     }
 }

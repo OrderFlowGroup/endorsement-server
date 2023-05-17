@@ -12,6 +12,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+    "useUnknownInCatchVariables": false,
   },
   "include": [
     "src",

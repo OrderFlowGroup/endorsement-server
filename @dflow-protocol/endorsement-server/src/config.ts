@@ -9,6 +9,9 @@ export const endorsementServerConfigFile = z.object({
     /** Each endorsement expires this many seconds after it is issued */
     expirationInSeconds: z.optional(z.number().int().positive()),
 
+    /** If true, then payment in lieu approval endpoint will be disabled */
+    disablePaymentInLieuApproval: z.optional(z.boolean()),
+
     /** Optional server settings */
     server: z.optional(z.object({
         /** Server port */
@@ -25,6 +28,7 @@ export const endorsementServerConfigFile = z.object({
 export type EndorsementServerConfig = {
     endorsementKey: nacl.SignKeyPair
     expirationInSeconds: number
+    disablePaymentInLieuApproval: boolean
     server: {
         port: number
         corsOrigin?: string

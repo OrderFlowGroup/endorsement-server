@@ -4,12 +4,21 @@ import {
     EndorsementResponse,
     endorsementKeyPath,
     healthCheckPath,
-    ResponseCode,
     schemaEndorsementRequest,
+    paymentInLieuApprovalPath,
+    PaymentInLieuApprovalResponse,
+    PaymentInLieuApprovalRequest,
+    schemaPaymentInLieuApprovalRequest,
 } from "@dflow-protocol/endorsement-client-lib";
 import { Request, Response, Router } from "express";
 import { EndorsementServerContext } from "./context";
-import { RejectReason } from "./requestEndorser";
+import {
+    EndorsementExpired,
+    InvalidEndorsementRequest,
+    InvalidPaymentInLieuApprovalRequest,
+    RateLimitExceeded,
+} from "./error";
+import { NotEndorsedReason, PaymentInLieuRejectedReason } from "./requestEndorser";
 
 export class EndorsementAPIRouter {
     readonly context: EndorsementServerContext;
@@ -24,8 +33,14 @@ export class EndorsementAPIRouter {
 
         this.getEndorsement = this.getEndorsement.bind(this);
         this.router.get(endorsementPath, this.getEndorsement);
+
         this.getEndorsementKey = this.getEndorsementKey.bind(this);
         this.router.get(endorsementKeyPath, this.getEndorsementKey);
+
+        if (context.config.disablePaymentInLieuApproval !== true) {
+            this.paymentInLieuApproval = this.paymentInLieuApproval.bind(this);
+            this.router.post(paymentInLieuApprovalPath, this.paymentInLieuApproval);
+        }
     }
 
     async healthCheck(_req: Request, res: Response): Promise<Response> {
@@ -36,49 +51,72 @@ export class EndorsementAPIRouter {
         req: Request,
         res: Response<EndorsementResponse>,
     ): Promise<Response<EndorsementResponse>> {
-        const args = this.parseEndorsementRequest(req.query);
-        if (args === null) {
-            return res.json({
-                code: ResponseCode.InvalidRequest,
-            });
+        let args: EndorsementRequest;
+        try {
+            args = schemaEndorsementRequest.parse(req.query);
+        } catch (error) {
+            throw new InvalidEndorsementRequest(error);
         }
+        const now = new Date();
 
-        const result = await this.context.requestEndorser.maybeEndorse(args);
-        if (result.approved) {
+        const result = await this.context.requestEndorser.maybeEndorse(args, now);
+        if (result.endorsed) {
             return res.json({
-                code: ResponseCode.EndorsementOk,
-                endorsement: {
-                    endorser: this.context.requestEndorser.base58PublicKey,
-                    signature: result.endorsement.signature,
-                    id: result.endorsement.id,
-                    expirationTimeUTC: result.endorsement.expirationTimeUTC,
-                },
+                endorser: this.context.requestEndorser.base58PublicKey,
+                signature: result.endorsement.signature,
+                id: result.endorsement.id,
+                expirationTimeUTC: result.endorsement.expirationTimeUTC,
             });
         }
 
         switch (result.reason) {
-            case RejectReason.RateLimitExceeded: {
-                return res.json({
-                    code: ResponseCode.RateLimitExceeded,
-                });
+            case NotEndorsedReason.RateLimitExceeded: {
+                throw new RateLimitExceeded();
             }
             default: {
-                throw new Error(`Unrecognized RejectReason ${RejectReason[result.reason]}`)
+                const _exhaustiveCheck: never = result.reason;
+                throw new Error(`Unrecognized RejectReason ${NotEndorsedReason[result.reason]}`);
             }
         }
     }
 
-    parseEndorsementRequest(query: any): EndorsementRequest | null {
-        try {
-            return schemaEndorsementRequest.parse(query);
-        } catch {
-            return null;
-        }
+    async getEndorsementKey(_req: Request, res: Response) {
+        return res.json({ publicKey: this.context.requestEndorser.base58PublicKey });
     }
 
-    async getEndorsementKey(req: Request, res: Response) {
-        return res.json({
-            publicKey: this.context.requestEndorser.base58PublicKey,
-        });
+    async paymentInLieuApproval(
+        req: Request,
+        res: Response<PaymentInLieuApprovalResponse>,
+    ): Promise<Response<PaymentInLieuApprovalResponse>> {
+        let args: PaymentInLieuApprovalRequest;
+        try {
+            args = schemaPaymentInLieuApprovalRequest.parse(req.body);
+        } catch (error) {
+            throw new InvalidPaymentInLieuApprovalRequest(error);
+        }
+        const now = new Date();
+
+        const result = await this.context.requestEndorser.maybeApprovePaymentInLieu(args, now);
+        if (result.approved) {
+            return res.json({
+                approver: this.context.requestEndorser.base58PublicKey,
+                approval: result.approval,
+            });
+        }
+
+        switch (result.reason) {
+            case PaymentInLieuRejectedReason.EndorsementExpired: {
+                throw new EndorsementExpired();
+            }
+            case PaymentInLieuRejectedReason.RateLimitExceeded: {
+                throw new RateLimitExceeded();
+            }
+            default: {
+                const _exhaustiveCheck: never = result.reason;
+                throw new Error(
+                    `Unrecognized RejectReason ${PaymentInLieuRejectedReason[result.reason]}`
+                );
+            }
+        }
     }
 }

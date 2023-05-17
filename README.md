@@ -75,21 +75,16 @@ The following walks through the endorsement server's various configuration optio
 | `--endorsement-key-path` | `endorsementKeyPath` | | string | Path to the endorsement key file |
 | | | `ENDORSEMENT_KEY` | string | Endorsement private key as a JSON string |
 | `--expiration-in-seconds` | `expirationInSeconds` | | integer | Each endorsement expires this many seconds after it is issued |
+| `--disable-payment-in-lieu-approval` | `disablePaymentInLieuApproval` | | boolean | Disable payment in lieu approval endpoint |
 | `--server.*` | `server` | | object | Server configuration options including port, CORS allowed origin, and HTTP keep alive timeout |
 
 #### Example config file
-```json
-{
-    "endorsementKeyPath": "endorsementKey.json",
-    "expirationInSeconds": 60,
-    "server": {
-        "port": 8082,
-        "cors": {
-            "origin": "*"
-        },
-        "keepAliveTimeout": 120
-    }
-}
+```yaml
+endorsementKeyPath: ./endorsementKey.json
+server:
+    port: 8082
+    cors:
+        origin: "*"
 ```
 
 ## Run using Node.js
@@ -126,7 +121,7 @@ $ yarn start --endorsement-key-path endorsemenKey.json
 ```
 
 ## Run in development mode using Node.js
-The endorsement server can be run in development mode using Node.js and Yarn. When running in development mode, the endorsement server will automatically restart when changes are made to the source code in @dflow-protocol/endorsement-server. In this mode, the endorsement server will use the `dev-config.json` file. Note that the endorsement server will only auto-restart when files in @dflow-protocol/endorsement-server change. If you make a change to @dflow-protocol/endorsement-client-lib, you need to rerun `yarn build` from the root of the repository.
+The endorsement server can be run in development mode using Node.js and Yarn. When running in development mode, the endorsement server will automatically restart when changes are made to the source code in @dflow-protocol/endorsement-server. In this mode, the endorsement server will use the `dev-config.yaml` file. Note that the endorsement server will only auto-restart when files in @dflow-protocol/endorsement-server change. If you make a change to @dflow-protocol/endorsement-client-lib, you need to rerun `yarn build` from the root of the repository.
 
 #### Install dependencies
 From the root of the repository, run:

@@ -2,6 +2,7 @@ import fs from "fs";
 import process from "process";
 import { Command, Option } from "commander";
 import dotenv from "dotenv";
+import yaml from "js-yaml";
 import nacl from "tweetnacl";
 import {
     EndorsementServerConfig,
@@ -17,7 +18,7 @@ async function main(opts: any): Promise<void> {
 
     let configFile: EndorsementServerConfigFile | undefined;
     if (opts.config !== undefined) {
-        const rawConfigFile = JSON.parse(fs.readFileSync(opts.config, "utf-8"));
+        const rawConfigFile = yaml.load(fs.readFileSync(opts.config, "utf-8"));
         configFile = endorsementServerConfigFile.parse(rawConfigFile);
     }
 
@@ -53,6 +54,11 @@ async function main(opts: any): Promise<void> {
         logAndExit("Endorsement expiration must be at most 120 seconds");
     }
 
+    const disablePaymentInLieuApproval = opts.disablePaymentInLieuApproval !== undefined
+        ? opts.disablePaymentInLieuApproval
+        : configFile?.disablePaymentInLieuApproval
+        ?? false;
+
     const port = opts["server.port"] ?? configFile?.server?.port ?? 8082;
     const corsOrigin = opts["server.cors.origin"] ?? configFile?.server?.cors?.origin;
     const keepAliveTimeout = opts["server.keep-alive-timeout"]
@@ -61,7 +67,8 @@ async function main(opts: any): Promise<void> {
 
     const config: EndorsementServerConfig = {
         endorsementKey,
-        expirationInSeconds: expirationInSeconds,
+        expirationInSeconds,
+        disablePaymentInLieuApproval,
         server: {
             port,
             corsOrigin,
@@ -116,6 +123,10 @@ const program = new Command()
     .addOption(new Option(
         "--expiration-in-seconds <SECONDS>",
         "Each endorsement expires this many seconds after it is issued",
+    ))
+    .addOption(new Option(
+        "--disable-payment-in-lieu-approval",
+        "Disable payment in lieu approval endpoint",
     ))
     .addOption(new Option("--server.port <PORT>", "Port to listen on"))
     .addOption(new Option("--server.cors.origin <ORIGIN>", "CORS allowed origin"))
