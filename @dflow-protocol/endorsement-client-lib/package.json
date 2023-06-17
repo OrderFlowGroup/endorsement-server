@@ -16,7 +16,7 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@dflow-protocol/signatory-client-lib": "^0.2.0",
+    "@dflow-protocol/signatory-client-lib": "^0.4.0",
     "zod": "^3.21.4"
   },
   "devDependencies": {
