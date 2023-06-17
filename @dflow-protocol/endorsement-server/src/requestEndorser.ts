@@ -80,9 +80,40 @@ export class RequestEndorser {
             throw new InvalidEndorsementRequest("platformFeeBps not specified");
         }
 
+        const sendToken = request.sendToken;
+        const sendQty = request.sendQty;
+        const maxSendQty = request.maxSendQty;
+        if (sendQty && maxSendQty) {
+            throw new InvalidEndorsementRequest(
+                "request cannot specify both sendQty and maxSendQty"
+            );
+        } else if (sendQty) {
+            if (!isValidSendQty(sendQty)) {
+                throw new InvalidEndorsementRequest("invalid sendQty");
+            }
+            if (!sendToken) {
+                throw new InvalidEndorsementRequest(
+                    "sendToken must be specified if sendQty is specified"
+                );
+            }
+        } else if (maxSendQty) {
+            if (!isValidSendQty(maxSendQty)) {
+                throw new InvalidEndorsementRequest("invalid maxSendQty");
+            }
+            if (!sendToken) {
+                throw new InvalidEndorsementRequest(
+                    "sendToken must be specified if maxSendQty is specified"
+                );
+            }
+        }
+
         const endorsementData = makeEndorsementData({
             retailTrader: request.retailTrader,
             platformFee,
+            sendToken,
+            receiveToken: request.receiveToken,
+            sendQuantity: sendQty,
+            maxSendQuantity: maxSendQty,
         });
 
         const msg = makeEndorsementMessage(id, expirationTimeUTC, endorsementData);
@@ -142,5 +173,14 @@ function tryParsePlatformFeeBps(raw: string): number | null {
         return parsed;
     } catch {
         return null;
+    }
+}
+
+function isValidSendQty(raw: string): boolean {
+    try {
+        BigInt(raw);
+        return true;
+    } catch {
+        return false;
     }
 }
