@@ -58,14 +58,17 @@ export class EndorsementAPIRouter {
             throw new InvalidEndorsementRequest(error);
         }
         const now = new Date();
+        const requestEndorser = this.context.requestEndorser;
 
-        const result = await this.context.requestEndorser.maybeEndorse(args, now);
+        const result = await requestEndorser.maybeEndorse(args, now);
         if (result.endorsed) {
+            const endorsement = result.endorsement;
             return res.json({
-                endorser: this.context.requestEndorser.base58PublicKey,
-                signature: result.endorsement.signature,
-                id: result.endorsement.id,
-                expirationTimeUTC: result.endorsement.expirationTimeUTC,
+                endorser: requestEndorser.base58PublicKey,
+                signature: endorsement.signature,
+                id: endorsement.id,
+                expirationTimeUTC: endorsement.expirationTimeUTC,
+                data: endorsement.data,
             });
         }
 

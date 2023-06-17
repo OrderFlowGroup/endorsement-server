@@ -14,12 +14,12 @@ export class InvalidEndorsementRequest extends CustomError {
     public static readonly Msg = "Invalid endorsement request";
     public static readonly HttpStatus = HttpStatusCodes.BAD_REQUEST;
 
-    public static makeMessage(error: Error) {
-        return `${this.Msg}. ${error}`;
-    }
-
-    constructor(error: Error) {
-        super(InvalidEndorsementRequest.makeMessage(error), InvalidEndorsementRequest.HttpStatus);
+    constructor(inner: Error | string) {
+        const errorMsg = inner instanceof Error ? inner.message : inner;
+        super(
+            `${InvalidEndorsementRequest.Msg}: ${errorMsg}`,
+            InvalidEndorsementRequest.HttpStatus,
+        );
     }
 }
 

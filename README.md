@@ -35,7 +35,7 @@ $ docker run -itp 8082:8082 \
 ### GET /endorsement
 
 #### Request
-Specify the retail trader's wallet address as a query parameter in your request.
+Specify the retail trader's wallet address as a query parameter in your request. If you specify a platform fee in basis points and a platform fee receiver, quotes fetched using the endorsement will include a platform fee that is paid to the platform fee receiver.
 ##### cURL
 ```console
 curl --location 'localhost:8082/endorsement?retailTrader=0x7251a7e0664FBB7691cA5951eD2B2A340Da07175'
@@ -46,7 +46,23 @@ curl --location 'localhost:8082/endorsement?retailTrader=0x7251a7e0664FBB7691cA5
 // Use your endorsement server's URL
 const endorsementServerURL = "http://localhost:8082/endorsement";
 const walletAddress = "0x7251a7e0664FBB7691cA5951eD2B2A340Da07175";
-const endorsementURL = endorsementServerURL + "?retailTrader=" + walletAddress;
+const endorsementURL = `${endorsementServerURL}?retailTrader=${walletAddress}`;
+const endorsement = await(await fetch(endorsementURL)).json();
+```
+
+##### cURL with platform fee
+```console
+curl --location 'localhost:8082/endorsement?retailTrader=0x7251a7e0664FBB7691cA5951eD2B2A340Da07175&platformFeeBps=85&platformFeeReceiver=0xA82c0A88fC0F1cD41F032EEEc37b06a3c6957e13'
+```
+
+##### TypeScript with platform fee
+```ts
+// Use your endorsement server's URL
+const endorsementServerURL = "http://localhost:8082/endorsement";
+const walletAddress = "0x7251a7e0664FBB7691cA5951eD2B2A340Da07175";
+const platformFeeBps = 85;
+const platformFeeReceiver = "0xA82c0A88fC0F1cD41F032EEEc37b06a3c6957e13";
+const endorsementURL = `${endorsementServerURL}?retailTrader=${walletAddress}&platformFeeBps=${platformFeeBps}&platformFeeReceiver=${platformFeeReceiver}`;
 const endorsement = await(await fetch(endorsementURL)).json();
 ```
 
@@ -57,12 +73,14 @@ The response contains the following endorsement object that your client code wil
 {
   // Base58-encoded endorsement key public key used to sign the endorsement message
   "endorser": "string",
-  // Base64-encoded Ed25519 signature of "{id},{expirationTime}" or "{id},{expirationTime},{retailTrader}"
+  // Base64-encoded Ed25519 signature of "{id},{expirationTime},{data}"
   "signature": "string",
   // Unique identifier for the endorsement
   "id": "string",
   // Expiration time as UTC. Number of seconds since Jan 1, 1970 00:00:00 UTC.
-  "expirationTimeUTC": "integer"
+  "expirationTimeUTC": "integer",
+  // The endorsement's data
+  "data": "string",
 }
 ```
 

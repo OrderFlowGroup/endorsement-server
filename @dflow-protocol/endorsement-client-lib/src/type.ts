@@ -4,8 +4,13 @@ import { z } from "zod";
 export type EndorsementRequest = z.infer<typeof schemaEndorsementRequest>;
 export const schemaEndorsementRequest = z.object({
     /** Public key of the retail trader's wallet on the settlement network, encoded using the
-     *  encoding scheme used for wallet addresses on the settlement network. */
+     * encoding scheme used for wallet addresses on the settlement network. */
     retailTrader: z.optional(z.string()),
+    /** Platform fee amount in basis points. Fractional basis points are not supported. */
+    platformFeeBps: z.optional(z.string()),
+    /** Public key of the platform fee receiver's wallet on the settlement network, encoded using
+     * the encoding scheme used for wallet addresses on the settlement network. */
+    platformFeeReceiver: z.optional(z.string()),
 });
 
 export type EndorsementResponse = z.infer<typeof schemaEndorsementResponse>;

@@ -12,9 +12,11 @@ export async function getEndorsement(
     endorsementServerURL: string,
     params: EndorsementRequest,
 ): Promise<EndorsementResponse> {
-    const urlParams = new URLSearchParams(
-        params.retailTrader ? { retailTrader: params.retailTrader } : {}
-    );
+    const stringParams = Object.entries(params).reduce((acc, curr) => {
+        acc[curr[0]] = curr[1].toString();
+        return acc;
+    }, {} as Record<string, string>);
+    const urlParams = new URLSearchParams(stringParams);
     const url = `${endorsementServerURL}${apiBasePath}${endorsementPath}?${urlParams}`;
     const responseObj = await fetch(url);
     await throwIfNotOkay(responseObj);

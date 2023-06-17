@@ -2,9 +2,10 @@ import {
     EndorsementRequest,
     PaymentInLieuApprovalRequest,
 } from "@dflow-protocol/endorsement-client-lib";
-import { makePaymentInLieuMessage } from "@dflow-protocol/signatory-client-lib";
+import { makeEndorsementData, makeEndorsementMessage } from "@dflow-protocol/signatory-client-lib";
 import bs58 from "bs58";
 import { randomBytes } from "crypto";
+import { InvalidEndorsementRequest } from "./error";
 import nacl from "tweetnacl";
 
 export type EndorseResult = EndorsedResult | NotEndorsedResult
@@ -15,6 +16,7 @@ export type EndorsedResult = {
         signature: string
         id: string
         expirationTimeUTC: number
+        data: string
     }
 }
 
@@ -59,18 +61,39 @@ export class RequestEndorser {
         const id = randomBytes(8).toString("base64");
         const nowUTCSeconds = Math.floor(now.getTime() / 1000);
         const expirationTimeUTC = nowUTCSeconds + this.expirationInSeconds;
-        const msg = request.retailTrader === undefined
-            ? `${id},${expirationTimeUTC}`
-            : `${id},${expirationTimeUTC},${request.retailTrader}`;
+
+        const { platformFeeBps, platformFeeReceiver } = request;
+        let platformFee;
+        if (platformFeeBps !== undefined && platformFeeReceiver !== undefined) {
+            const parsedPlatformFeeBps = tryParsePlatformFeeBps(platformFeeBps);
+            if (parsedPlatformFeeBps === null) {
+                throw new InvalidEndorsementRequest("invalid platformFeeBps");
+            }
+            platformFee = { bps: parsedPlatformFeeBps, receiver: platformFeeReceiver };
+        } else if (platformFeeBps !== undefined) {
+            throw new InvalidEndorsementRequest("platformFeeReceiver not specified");
+        } else if (platformFeeReceiver !== undefined) {
+            throw new InvalidEndorsementRequest("platformFeeBps not specified");
+        }
+
+        const endorsementData = makeEndorsementData({
+            retailTrader: request.retailTrader,
+            platformFee,
+        });
+
+        const msg = makeEndorsementMessage(id, expirationTimeUTC, endorsementData);
+
         const msgBuffer = Buffer.from(msg, "utf-8");
         const signatureBuffer = nacl.sign.detached(msgBuffer, this.keypair.secretKey);
         const signature = Buffer.from(signatureBuffer).toString("base64");
+
         return {
             endorsed: true,
             endorsement: {
                 signature,
                 id,
                 expirationTimeUTC,
+                data: endorsementData,
             },
         };
     }
@@ -103,5 +126,17 @@ export class RequestEndorser {
             approved: true,
             approval: approvalSignature,
         };
+    }
+}
+
+function tryParsePlatformFeeBps(raw: string): number | null {
+    try {
+        const parsed = Number(BigInt(raw));
+        if (parsed < 0 || parsed > 5000) {
+            return null;
+        }
+        return parsed;
+    } catch {
+        return null;
     }
 }
