@@ -5,7 +5,7 @@ import {
 import {
     makeEndorsementData,
     makeEndorsementMessage,
-    makePaymentInLieuMessage,
+    makePaymentInLieuApprovalMessage,
 } from "@dflow-protocol/signatory-client-lib";
 import bs58 from "bs58";
 import { randomBytes } from "crypto";
@@ -150,7 +150,7 @@ export class RequestEndorser {
         // Note that we don't verify DFlow node's signature of the payment in lieu token. The DFlow
         // node will not accept the approval if the token was tampered with.
 
-        const approvalMessage = makePaymentInLieuMessage(paymentInLieuToken);
+        const approvalMessage = makePaymentInLieuApprovalMessage(paymentInLieuToken);
         const approvalMessageBuffer = Buffer.from(approvalMessage, "utf-8");
         const approvalSignatureBuffer = nacl.sign.detached(
             approvalMessageBuffer,
