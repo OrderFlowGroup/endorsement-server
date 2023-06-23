@@ -56,3 +56,15 @@ export class EndorsementExpired extends CustomError {
         super(EndorsementExpired.Msg, EndorsementExpired.HttpStatus);
     }
 }
+
+export class InvalidPaymentInLieuTokenSignature extends CustomError {
+    public static readonly Msg = "Invalid payment in lieu token signature";
+    public static readonly HttpStatus = HttpStatusCodes.BAD_REQUEST;
+
+    constructor() {
+        super(
+            InvalidPaymentInLieuTokenSignature.Msg,
+            InvalidPaymentInLieuTokenSignature.HttpStatus,
+        );
+    }
+}

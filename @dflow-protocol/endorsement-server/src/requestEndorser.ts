@@ -6,6 +6,7 @@ import {
     makeEndorsementData,
     makeEndorsementMessage,
     makePaymentInLieuApprovalMessage,
+    makePaymentInLieuMessage,
 } from "@dflow-protocol/signatory-client-lib";
 import bs58 from "bs58";
 import { randomBytes } from "crypto";
@@ -48,6 +49,7 @@ export type PaymentInLieuRejectedResult = {
 export enum PaymentInLieuRejectedReason {
     EndorsementExpired = 1,
     RateLimitExceeded = 2,
+    InvalidPaymentInLieuTokenSignature = 3,
 }
 
 export class RequestEndorser {
@@ -147,8 +149,23 @@ export class RequestEndorser {
             return { approved: false, reason: PaymentInLieuRejectedReason.EndorsementExpired };
         }
 
-        // Note that we don't verify DFlow node's signature of the payment in lieu token. The DFlow
-        // node will not accept the approval if the token was tampered with.
+        // Verify the issuer's signature of the payment in lieu message. This is needed to ensure we
+        // don't sign arbitrary payloads.
+        const paymentInLieuMessage = makePaymentInLieuMessage(paymentInLieuToken);
+        const paymentInLieuMessageBuffer = Buffer.from(paymentInLieuMessage, "utf-8");
+        const paymentInLieuSignatureBuffer = Buffer.from(paymentInLieuToken.signature, "base64");
+        const issuerPublicKey = bs58.decode(paymentInLieuToken.issuer);
+        const isValidPaymentInLieuTokenSignature = nacl.sign.detached.verify(
+            paymentInLieuMessageBuffer,
+            paymentInLieuSignatureBuffer,
+            issuerPublicKey,
+        );
+        if (!isValidPaymentInLieuTokenSignature) {
+            return {
+                approved: false,
+                reason: PaymentInLieuRejectedReason.InvalidPaymentInLieuTokenSignature,
+            };
+        }
 
         const approvalMessage = makePaymentInLieuApprovalMessage(paymentInLieuToken);
         const approvalMessageBuffer = Buffer.from(approvalMessage, "utf-8");

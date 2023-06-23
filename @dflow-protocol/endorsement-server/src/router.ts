@@ -16,6 +16,7 @@ import {
     EndorsementExpired,
     InvalidEndorsementRequest,
     InvalidPaymentInLieuApprovalRequest,
+    InvalidPaymentInLieuTokenSignature,
     RateLimitExceeded,
 } from "./error";
 import { NotEndorsedReason, PaymentInLieuRejectedReason } from "./requestEndorser";
@@ -113,6 +114,9 @@ export class EndorsementAPIRouter {
             }
             case PaymentInLieuRejectedReason.RateLimitExceeded: {
                 throw new RateLimitExceeded();
+            }
+            case PaymentInLieuRejectedReason.InvalidPaymentInLieuTokenSignature: {
+                throw new InvalidPaymentInLieuTokenSignature();
             }
             default: {
                 const _exhaustiveCheck: never = result.reason;

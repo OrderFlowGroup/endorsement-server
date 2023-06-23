@@ -103,17 +103,17 @@ Specify the payment in lieu token returned by the signatory server API in the re
 ```json
 {
     "paymentInLieuToken": {
-        "issuer": "xyz",
-        "signature": "xyz",
-        "id": "xyz",
-        "notional": 500,
-        "auctionId": 1,
-        "auctionEpoch": 5,
+        "issuer": "2AGChJgTw7BfaxhZCNpZwEfMYLVTEpQiBx2rmg21JS6n",
+        "signature": "HA06SJxFc/khyqu/1vNVk9AvyiRCMfnCiA7Yy1eWRcPsgzLq515cIqhPtD/90+IRKlpKQRCSMEAU4Qb+fxoHDw==",
+        "id": "f744627b-56c8-4e09-98e5-c77d969211c0",
+        "notional": 333,
+        "auctionId": 0,
+        "auctionEpoch": 2,
         "endorsement": {
-            "endorser": "2oj4WbopRyH2KKPZxpkz3LKzNJ5qNNBD9CA1qTFbx9tn",
-            "signature": "Q4lm/Cj8CUupdNebcxEE57kebjuSrirQN5/vbzyL4AQaQwssoMe9Sp8zvghhjmA1qexYLImAPvSFyaQaXU8zAw==",
-            "id": "gvqXmm9JKvg=",
-            "expirationTimeUTC": 1687492359,
+            "endorser": "endsMtTJP7W4cHe2szQ4DUTvW9xdtTXtBGtscgXsGsK",
+            "signature": "kjIntjj5FEModvGHVoPk3cIf/HaVa6LpvmaVuluINzdgXNx8ErnXtGq20A/9H564Ae+Kvuik7aYMPZydS6jOCA==",
+            "id": "xBwyBCFu2Qk=",
+            "expirationTimeUTC": 1687534328,
             "data": "1|rtFMmRrBUKnz6hXm2KfEQBK7GLMq8ziHCt9yZrEMmF7|||||"
         }
     }
@@ -124,8 +124,8 @@ Specify the payment in lieu token returned by the signatory server API in the re
 The response contains the endorser's approval of the payment in lieu.
 ```json
 {
-    "approver": "2oj4WbopRyH2KKPZxpkz3LKzNJ5qNNBD9CA1qTFbx9tn",
-    "approval": "hXHDKTpFuo+7u9HzYgNCJZef0ZNjz+5RSSoYVXUF/QJba32gygC9JZDDoJLsTRykCKLjNqPsKXFhHfwZbhfQBA=="
+    "approver": "endsMtTJP7W4cHe2szQ4DUTvW9xdtTXtBGtscgXsGsK",
+    "approval": "sWjfnnPFjSQpHlCGXlAWrdCYAjbfgvZJNZ7NVAhH8qwV9Xv0Ql5pFqCMdudCqfRN8ZvpCvRIfk1TiPHiGPg7AA=="
 }
 ```
 
