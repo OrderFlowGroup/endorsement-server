@@ -95,6 +95,40 @@ The response contains the following endorsement object that your client code wil
 }
 ```
 
+### POST /paymentInLieuApproval
+The `paymentInLieuApproval` endpoint is used to accept a payment in lieu. The request contains the payment in lieu token returned by the signatory server API and the response contains the approval that the signatory server requires to remit a payment in lieu.
+
+#### Request
+Specify the payment in lieu token returned by the signatory server API in the request body.
+```json
+{
+    "paymentInLieuToken": {
+        "issuer": "xyz",
+        "signature": "xyz",
+        "id": "xyz",
+        "notional": 500,
+        "auctionId": 1,
+        "auctionEpoch": 5,
+        "endorsement": {
+            "endorser": "2oj4WbopRyH2KKPZxpkz3LKzNJ5qNNBD9CA1qTFbx9tn",
+            "signature": "Q4lm/Cj8CUupdNebcxEE57kebjuSrirQN5/vbzyL4AQaQwssoMe9Sp8zvghhjmA1qexYLImAPvSFyaQaXU8zAw==",
+            "id": "gvqXmm9JKvg=",
+            "expirationTimeUTC": 1687492359,
+            "data": "1|rtFMmRrBUKnz6hXm2KfEQBK7GLMq8ziHCt9yZrEMmF7|||||"
+        }
+    }
+}
+```
+
+#### Response
+The response contains the endorser's approval of the payment in lieu.
+```json
+{
+    "approver": "2oj4WbopRyH2KKPZxpkz3LKzNJ5qNNBD9CA1qTFbx9tn",
+    "approval": "hXHDKTpFuo+7u9HzYgNCJZef0ZNjz+5RSSoYVXUF/QJba32gygC9JZDDoJLsTRykCKLjNqPsKXFhHfwZbhfQBA=="
+}
+```
+
 ## Configuration
 The following walks through the endorsement server's various configuration options. These configuration options can be set via the endorsement server's CLI, by using a config file, or via environment variables. Options specified via the CLI take precedence over options specified in a config file. Options specified via environment variables take least precedence.
 
