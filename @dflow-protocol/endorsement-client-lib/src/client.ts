@@ -12,7 +12,8 @@ export async function getEndorsement(
     endorsementServerURL: string,
     params: EndorsementRequest,
 ): Promise<EndorsementResponse> {
-    const stringParams = Object.entries(params).reduce((acc, curr) => {
+    const definedParams = Object.entries(params).filter(x => x[1] !== undefined);
+    const stringParams = definedParams.reduce((acc, curr) => {
         acc[curr[0]] = curr[1].toString();
         return acc;
     }, {} as Record<string, string>);
