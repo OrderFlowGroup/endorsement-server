@@ -8,7 +8,6 @@ use axum::{
 };
 use base64::Engine as _;
 use hyper::Method;
-use log;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{

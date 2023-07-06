@@ -2,7 +2,7 @@ use clap::{Args, Parser, Subcommand};
 use config::{Config, ServerConfig, ServerCorsConfig};
 use ed25519_dalek::{Keypair, PublicKey, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH};
 use rand::rngs::OsRng;
-use server::server::{run_server, ServerContext};
+use server::{run_server, ServerContext};
 use std::{
     env,
     fs::{self, OpenOptions},
