@@ -345,7 +345,7 @@ async fn payment_in_lieu_approval(
     }
 
     // Approve the payment in lieu
-    let approval_message = token.signature.as_bytes();
+    let approval_message = &issuer_signature_bytes;
     let approval_signature = context.endorsement_key.sign(approval_message);
     let approval_signature = base64::engine::general_purpose::STANDARD.encode(approval_signature);
 
