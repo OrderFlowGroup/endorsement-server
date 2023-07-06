@@ -14,20 +14,47 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   DOCKER_BUILD_CONTEXT: ./server
+  CARGO_TERM_COLOR: always
 
 jobs:
+  build-native:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
+      - name: Cache dependencies
+        uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-build-native-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run Clippy
+        uses: actions-rs/clippy-check@b5b5f21f4797c02da247df37026fcd0a5024aa4d
+        continue-on-error: true
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-targets --all-features
+      - name: Build
+        run: cargo build --verbose
+      - name: Test
+        run: cargo test --verbose
+
   build-docker-linux_amd64:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-
     steps:
       - name: Check out repository
         uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@16c0bc4a6e6ada2cfd8afd41d22d95379cf7c32a
-
       - name: Build linux/amd64 Docker image
         uses: docker/build-push-action@2eb1c1961a95fc15694676618e422e8ba1d63825
         with:
@@ -41,14 +68,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-
     steps:
       - name: Check out repository
         uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@16c0bc4a6e6ada2cfd8afd41d22d95379cf7c32a
-
       - name: Build linux/arm64 Docker image
         uses: docker/build-push-action@2eb1c1961a95fc15694676618e422e8ba1d63825
         with:
@@ -66,11 +90,9 @@ jobs:
     permissions:
       contents: read
       packages: write
-
     steps:
       - name: Check out repository
         uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
-
       - name: Prepare Docker image metadata
         id: meta
         uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175
@@ -80,17 +102,14 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@16c0bc4a6e6ada2cfd8afd41d22d95379cf7c32a
-
       - name: Log in to the container registry
         uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build and push multi-platform Docker image
         uses: docker/build-push-action@2eb1c1961a95fc15694676618e422e8ba1d63825
         with:
