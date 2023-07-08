@@ -69,7 +69,7 @@ async fn main() {
             KeySubCommands::Parse(args) => {
                 key_parse(args);
             }
-        }
+        },
     }
 }
 
@@ -79,24 +79,31 @@ async fn start(args: StartArgs) {
             let yaml_str = fs::read_to_string(&config_path).unwrap_or_else(|e| {
                 log_and_exit(format!("Failed to read config file {config_path}: {e}"))
             });
-            serde_yaml::from_str::<Config>(&yaml_str).map(Some).unwrap_or_else(|e| {
-                log_and_exit(format!("Failed to parse config file {config_path}: {e}"))
-            })
+            serde_yaml::from_str::<Config>(&yaml_str)
+                .map(Some)
+                .unwrap_or_else(|e| {
+                    log_and_exit(format!("Failed to parse config file {config_path}: {e}"))
+                })
         }
-        None => None
+        None => None,
     };
 
-    let endorsement_key = args.endorsement_key_path
+    let endorsement_key = args
+        .endorsement_key_path
         .or_else(|| config.clone().and_then(|x| x.endorsement_key_path))
         .map(|path| read_endorsement_key_from_file(&path))
-        .or_else(|| env::var("ENDORSEMENT_KEY")
-            .map_or(None, |raw| Some(parse_endorsement_key(&raw))))
-        .unwrap_or_else(|| log_and_exit(
+        .or_else(|| {
+            env::var("ENDORSEMENT_KEY").map_or(None, |raw| Some(parse_endorsement_key(&raw)))
+        })
+        .unwrap_or_else(|| {
+            log_and_exit(
             "Endorsement key not provided via CLI, config file, or ENDORSEMENT_KEY environment \
             variable. You must specify an endorsement key using one of these methods.".to_string()
-        ));
+        )
+        });
 
-    let expiration_in_seconds = args.expiration_in_seconds
+    let expiration_in_seconds = args
+        .expiration_in_seconds
         .or_else(|| config.clone().and_then(|x| x.expiration_in_seconds))
         .unwrap_or(DEFAULT_EXPIRATION_IN_SECONDS);
     if expiration_in_seconds < EXPIRATION_IN_SECONDS_MIN {
@@ -109,16 +116,25 @@ async fn start(args: StartArgs) {
         ));
     }
 
-    let disable_payment_in_lieu_approval = args.disable_payment_in_lieu_approval
-        .or_else(|| config.clone().and_then(|x| x.disable_payment_in_lieu_approval))
+    let disable_payment_in_lieu_approval = args
+        .disable_payment_in_lieu_approval
+        .or_else(|| {
+            config
+                .clone()
+                .and_then(|x| x.disable_payment_in_lieu_approval)
+        })
         .unwrap_or(false);
 
-    let port = args.server_port
+    let port = args
+        .server_port
         .or_else(|| config.clone().and_then(|c| c.server.map(|s| s.port)))
         .unwrap_or(DEFAULT_PORT);
 
-    let cors_origin = args.server_cors_origin
-        .or_else(|| config.clone().and_then(|c| c.server.and_then(|s| s.cors.map(|sc| sc.origin))));
+    let cors_origin = args.server_cors_origin.or_else(|| {
+        config
+            .clone()
+            .and_then(|c| c.server.and_then(|s| s.cors.map(|sc| sc.origin)))
+    });
 
     let base58_endorsement_key = get_base58_public_key(endorsement_key.public);
     let server_context = ServerContext {
@@ -174,7 +190,9 @@ fn log_and_exit(msg: String) -> ! {
 
 fn read_endorsement_key_from_file(path: &str) -> Keypair {
     let raw_endorsement_key: String = fs::read_to_string(path).unwrap_or_else(|e| {
-        log_and_exit(format!("Failed to read endorsement key from file {path}. {e}"))
+        log_and_exit(format!(
+            "Failed to read endorsement key from file {path}. {e}"
+        ))
     });
     parse_endorsement_key(&raw_endorsement_key)
 }

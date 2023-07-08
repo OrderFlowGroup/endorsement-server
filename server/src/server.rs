@@ -56,7 +56,9 @@ pub async fn run_server(context: ServerContext) {
                 .allow_methods(allowed_methods)
                 .allow_origin(AllowOrigin::any())
         } else {
-            let parsed_origin = cors_config.origin.parse()
+            let parsed_origin = cors_config
+                .origin
+                .parse()
                 .unwrap_or_else(|_| panic!("Invalid CORS origin {}", cors_config.origin));
             CorsLayer::new()
                 .allow_methods(allowed_methods)
@@ -113,6 +115,7 @@ impl From<PaymentInLieuApprovalError> for AppError {
 }
 
 impl IntoResponse for AppError {
+    #[rustfmt::skip]
     fn into_response(self) -> Response {
         let (status, msg) = match self {
             AppError::Endorsement(EndorsementError::InvalidPlatformFeeBps) => {
@@ -332,15 +335,20 @@ async fn payment_in_lieu_approval(
     );
     let payment_in_lieu_message = payment_in_lieu_message.as_bytes();
 
-    let issuer_signature_bytes = base64::engine::general_purpose::STANDARD.decode(&token.signature)
+    let issuer_signature_bytes = base64::engine::general_purpose::STANDARD
+        .decode(&token.signature)
         .map_err(|_| PaymentInLieuApprovalError::InvalidPaymentInLieuTokenSignature)?;
     let issuer_signature = ed25519_dalek::Signature::from_bytes(&issuer_signature_bytes)
         .map_err(|_| PaymentInLieuApprovalError::InvalidPaymentInLieuTokenSignature)?;
-    let issuer_public_key_bytes = bs58::decode(token.issuer.as_bytes()).into_vec()
+    let issuer_public_key_bytes = bs58::decode(token.issuer.as_bytes())
+        .into_vec()
         .map_err(|_| PaymentInLieuApprovalError::InvalidPaymentInLieuToken)?;
     let issuer_public_key = ed25519_dalek::PublicKey::from_bytes(&issuer_public_key_bytes)
         .map_err(|_| PaymentInLieuApprovalError::InvalidPaymentInLieuToken)?;
-    if issuer_public_key.verify_strict(payment_in_lieu_message, &issuer_signature).is_err() {
+    if issuer_public_key
+        .verify_strict(payment_in_lieu_message, &issuer_signature)
+        .is_err()
+    {
         return Err(PaymentInLieuApprovalError::InvalidPaymentInLieuTokenSignature.into());
     }
 
