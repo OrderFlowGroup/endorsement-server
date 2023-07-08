@@ -1,37 +1,35 @@
 # docker build --tag endorsement-server:latest .
 
-FROM rust:1.70.0-slim-buster as build
+FROM rust:1.70.0-slim-buster as rust-dev-env
+RUN rustup component add clippy rustfmt
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# install build dependencies
-RUN apt-get update
-RUN apt-get install pkg-config libssl-dev -y
 
-# create a new empty shell project
+FROM rust-dev-env as build-dependencies
+# Build and cache dependencies
 RUN USER=root cargo new --bin endorsement-server
 WORKDIR /endorsement-server
-
-# copy over your manifests
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
-
-# this build step will cache your dependencies
 RUN cargo build --release
-RUN rm src/*.rs
+RUN rm -rf src target/release/endorsement-server* target/release/deps/endorsement_server*
 
-# copy your source tree
+
+FROM build-dependencies as build
 COPY ./src ./src
-
-# build for release
-RUN rm ./target/release/deps/endorsement_server*
 RUN cargo build --release
 
-# our final base
-FROM gcr.io/distroless/cc as runner
 
-# copy the build artifact from the build stage
+FROM build as check
+RUN cargo clippy --all-targets --all-features -- -D warnings
+RUN cargo test --release
+RUN cargo fmt --check
+
+
+FROM gcr.io/distroless/cc as release
 COPY --from=build /endorsement-server/target/release/endorsement-server .
-
 STOPSIGNAL SIGINT
-
-# set the startup command to run your binary
 ENTRYPOINT ["./endorsement-server"]
