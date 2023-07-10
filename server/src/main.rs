@@ -17,6 +17,7 @@ use tokio::{
 };
 
 mod config;
+mod endorsement;
 mod server;
 
 const DEFAULT_PORT: u16 = 8082;

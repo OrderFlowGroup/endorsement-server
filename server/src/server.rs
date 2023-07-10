@@ -1,4 +1,11 @@
-use crate::config::ServerConfig;
+use crate::{
+    config::ServerConfig,
+    endorsement::{Endorsement, EndorsementError, EndorsementParams},
+    payment_in_lieu::{
+        get_payment_in_lieu_approval, PaymentInLieuApproval, PaymentInLieuApprovalBody,
+        PaymentInLieuApprovalError,
+    },
+};
 use axum::{
     extract::{Json, Query},
     http::StatusCode,
@@ -82,22 +89,9 @@ pub enum AppError {
     PaymentInLieuApproval(PaymentInLieuApprovalError),
 }
 
-#[derive(Debug)]
-pub enum EndorsementError {
-    InvalidPlatformFeeBps,
-    PlatformFeeBpsTooHigh,
-    PlatformFeeBpsNotSpecified,
-    PlatformFeeReceiverNotSpecified,
-    SendQtyAndMaxSendQtySpecified,
-    SendQtyRequiresSendToken,
-    MaxSendQtyRequiresSendToken,
-    InvalidSendQty,
-    InvalidMaxSendQty,
-}
-
 impl From<EndorsementError> for AppError {
     fn from(inner: EndorsementError) -> Self {
-        AppError::Endorsement(inner)
+        Self::Endorsement(inner)
     }
 }
 
@@ -118,31 +112,31 @@ impl IntoResponse for AppError {
     #[rustfmt::skip]
     fn into_response(self) -> Response {
         let (status, msg) = match self {
-            AppError::Endorsement(EndorsementError::InvalidPlatformFeeBps) => {
+            Self::Endorsement(EndorsementError::InvalidPlatformFeeBps) => {
                 (StatusCode::BAD_REQUEST, "Invalid platformFeeBps")
             }
-            AppError::Endorsement(EndorsementError::PlatformFeeBpsTooHigh) => {
+            Self::Endorsement(EndorsementError::PlatformFeeBpsTooHigh) => {
                 (StatusCode::BAD_REQUEST, "platformFeeBps too high")
             }
-            AppError::Endorsement(EndorsementError::PlatformFeeBpsNotSpecified) => {
+            Self::Endorsement(EndorsementError::PlatformFeeBpsNotSpecified) => {
                 (StatusCode::BAD_REQUEST, "platformFeeBps not specified")
             }
-            AppError::Endorsement(EndorsementError::PlatformFeeReceiverNotSpecified) => {
+            Self::Endorsement(EndorsementError::PlatformFeeReceiverNotSpecified) => {
                 (StatusCode::BAD_REQUEST, "platformFeeReceiver not specified")
             }
-            AppError::Endorsement(EndorsementError::SendQtyAndMaxSendQtySpecified) => {
+            Self::Endorsement(EndorsementError::SendQtyAndMaxSendQtySpecified) => {
                 (StatusCode::BAD_REQUEST, "Request cannot specify both sendQty and maxSendQty")
             }
-            AppError::Endorsement(EndorsementError::SendQtyRequiresSendToken) => {
+            Self::Endorsement(EndorsementError::SendQtyRequiresSendToken) => {
                 (StatusCode::BAD_REQUEST, "sendToken must be specified if sendQty is specified")
             }
-            AppError::Endorsement(EndorsementError::MaxSendQtyRequiresSendToken) => {
+            Self::Endorsement(EndorsementError::MaxSendQtyRequiresSendToken) => {
                 (StatusCode::BAD_REQUEST, "sendToken must be specified if maxSendQty is specified")
             }
-            AppError::Endorsement(EndorsementError::InvalidSendQty) => {
+            Self::Endorsement(EndorsementError::InvalidSendQty) => {
                 (StatusCode::BAD_REQUEST, "Invalid sendQty")
             }
-            AppError::Endorsement(EndorsementError::InvalidMaxSendQty) => {
+            Self::Endorsement(EndorsementError::InvalidMaxSendQty) => {
                 (StatusCode::BAD_REQUEST, "Invalid maxSendQty")
             }
 
@@ -172,7 +166,7 @@ pub struct ErrorResponse {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct GetEndorsementParams {
+pub struct EndorsementRequestParams {
     pub retail_trader: Option<String>,
     pub platform_fee_bps: Option<String>,
     pub platform_fee_receiver: Option<String>,
@@ -182,97 +176,35 @@ struct GetEndorsementParams {
     pub max_send_qty: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Endorsement {
-    pub endorser: String,
-    pub signature: String,
-    pub id: String,
-    #[serde(rename = "expirationTimeUTC")]
-    pub expiration_time_utc: u64,
-    pub data: String,
-}
-
 type EndorsementResponse = Endorsement;
 
 async fn endorsement_handler(
-    Query(params): Query<GetEndorsementParams>,
+    Query(params): Query<EndorsementRequestParams>,
     Extension(context): Extension<Arc<ServerContext>>,
 ) -> Result<Json<EndorsementResponse>, AppError> {
-    let platform_fee_bps = params.platform_fee_bps.unwrap_or_default();
-    let platform_fee_receiver = params.platform_fee_receiver.unwrap_or_default();
-    let platform_fee_data: String;
-    if !platform_fee_bps.is_empty() && !platform_fee_receiver.is_empty() {
-        let bps = parse_platform_fee_bps(&platform_fee_bps)
-            .map_err(|_| EndorsementError::InvalidPlatformFeeBps)?;
-        if bps > 5000 {
-            return Err(EndorsementError::PlatformFeeBpsTooHigh.into());
-        }
-        platform_fee_data = format!("{platform_fee_bps},{platform_fee_receiver}");
-    } else if !platform_fee_bps.is_empty() {
-        return Err(EndorsementError::PlatformFeeReceiverNotSpecified.into());
-    } else if !platform_fee_receiver.is_empty() {
-        return Err(EndorsementError::PlatformFeeBpsNotSpecified.into());
-    } else {
-        platform_fee_data = String::from("");
-    }
-
-    let send_token = params.send_token.unwrap_or_default();
-    let send_qty = params.send_qty.unwrap_or_default();
-    let max_send_qty = params.max_send_qty.unwrap_or_default();
-    if !send_qty.is_empty() && !max_send_qty.is_empty() {
-        return Err(EndorsementError::SendQtyAndMaxSendQtySpecified.into());
-    } else if !send_qty.is_empty() {
-        if send_token.is_empty() {
-            return Err(EndorsementError::SendQtyRequiresSendToken.into());
-        }
-        let qty = parse_send_qty(&send_qty).map_err(|_| EndorsementError::InvalidSendQty)?;
-        if qty == 0 {
-            return Err(EndorsementError::InvalidSendQty.into());
-        }
-    } else if !max_send_qty.is_empty() {
-        if send_token.is_empty() {
-            return Err(EndorsementError::MaxSendQtyRequiresSendToken.into());
-        }
-        let qty = parse_send_qty(&max_send_qty).map_err(|_| EndorsementError::InvalidMaxSendQty)?;
-        if qty == 0 {
-            return Err(EndorsementError::InvalidMaxSendQty.into());
-        }
-    }
-
-    let retail_trader = params.retail_trader.unwrap_or_default();
-    let receive_token = params.receive_token.unwrap_or_default();
-
-    let data = format!(
-        "1|{}|{}|{}|{}|{}|{}",
-        retail_trader, platform_fee_data, send_token, receive_token, send_qty, max_send_qty,
-    );
-
     let id = thread_rng().gen::<u64>();
-    let id = base64::engine::general_purpose::STANDARD.encode(id.to_be_bytes());
     let now = seconds_since_epoch();
     let expiration_time_utc = now + context.expiration_in_seconds as u64;
-    let msg = format!("{id},{expiration_time_utc},{data}");
-    let msg = msg.as_bytes();
 
-    let sig = context.endorsement_key.sign(msg);
-    let base64_sig = base64::engine::general_purpose::STANDARD.encode(sig);
+    let endorsement_params = EndorsementParams {
+        retail_trader: params.retail_trader.as_deref(),
+        platform_fee_bps: params.platform_fee_bps.as_deref(),
+        platform_fee_receiver: params.platform_fee_receiver.as_deref(),
+        send_token: params.send_token.as_deref(),
+        receive_token: params.receive_token.as_deref(),
+        send_qty: params.send_qty.as_deref(),
+        max_send_qty: params.max_send_qty.as_deref(),
+    };
 
-    Ok(Json(EndorsementResponse {
-        endorser: context.base58_endorsement_key.clone(),
-        signature: base64_sig,
-        id,
+    let endorsement = Endorsement::new(
+        &endorsement_params,
+        &context.endorsement_key,
+        &context.base58_endorsement_key,
         expiration_time_utc,
-        data,
-    }))
-}
+        id,
+    )?;
 
-fn parse_platform_fee_bps(raw: &str) -> Result<u16, std::num::ParseIntError> {
-    raw.parse::<u16>()
-}
-
-fn parse_send_qty(raw: &str) -> Result<u64, std::num::ParseIntError> {
-    raw.parse::<u64>()
+    Ok(Json(endorsement))
 }
 
 #[derive(Debug, Serialize)]
