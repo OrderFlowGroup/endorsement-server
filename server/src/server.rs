@@ -1,10 +1,7 @@
 use crate::{
     config::ServerConfig,
     endorsement::{Endorsement, EndorsementError, EndorsementParams},
-    payment_in_lieu::{
-        get_payment_in_lieu_approval, PaymentInLieuApproval, PaymentInLieuApprovalBody,
-        PaymentInLieuApprovalError,
-    },
+    payment_in_lieu::{ApprovalError, PaymentInLieuApproval, PaymentInLieuToken, VerifyTokenError},
 };
 use axum::{
     extract::{Json, Query},
@@ -13,7 +10,6 @@ use axum::{
     routing::{get, post},
     Extension, Router,
 };
-use base64::Engine as _;
 use hyper::Method;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
@@ -26,7 +22,7 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 extern crate ed25519_dalek;
 extern crate rand;
 
-use ed25519_dalek::{Keypair, Signer};
+use ed25519_dalek::Keypair;
 
 #[derive(Debug)]
 pub struct ServerContext {
@@ -52,7 +48,10 @@ pub async fn run_server(context: ServerContext) {
         .route("/endorsement", get(endorsement_handler))
         .route("/endorsementKey", get(endorsement_key_handler));
     if !ctx.disable_payment_in_lieu_approval {
-        app = app.route("/paymentInLieuApproval", post(payment_in_lieu_approval));
+        app = app.route(
+            "/paymentInLieuApproval",
+            post(payment_in_lieu_approval_handler),
+        );
     }
     app = app.layer(Extension(ctx));
 
@@ -86,7 +85,7 @@ pub async fn run_server(context: ServerContext) {
 
 pub enum AppError {
     Endorsement(EndorsementError),
-    PaymentInLieuApproval(PaymentInLieuApprovalError),
+    PaymentInLieuApproval(ApprovalError),
 }
 
 impl From<EndorsementError> for AppError {
@@ -95,16 +94,9 @@ impl From<EndorsementError> for AppError {
     }
 }
 
-#[derive(Debug)]
-pub enum PaymentInLieuApprovalError {
-    EndorsementExpired,
-    InvalidPaymentInLieuToken,
-    InvalidPaymentInLieuTokenSignature,
-}
-
-impl From<PaymentInLieuApprovalError> for AppError {
-    fn from(inner: PaymentInLieuApprovalError) -> Self {
-        AppError::PaymentInLieuApproval(inner)
+impl From<ApprovalError> for AppError {
+    fn from(inner: ApprovalError) -> Self {
+        Self::PaymentInLieuApproval(inner)
     }
 }
 
@@ -140,14 +132,23 @@ impl IntoResponse for AppError {
                 (StatusCode::BAD_REQUEST, "Invalid maxSendQty")
             }
 
-            AppError::PaymentInLieuApproval(PaymentInLieuApprovalError::EndorsementExpired) => {
+            Self::PaymentInLieuApproval(ApprovalError::EndorsementExpired) => {
                 (StatusCode::BAD_REQUEST, "Endorsement expired")
             }
-            AppError::PaymentInLieuApproval(PaymentInLieuApprovalError::InvalidPaymentInLieuToken) => {
-                (StatusCode::BAD_REQUEST, "Invalid payment in lieu token")
+            Self::PaymentInLieuApproval(ApprovalError::InvalidToken(VerifyTokenError::InvalidSignatureEncoding)) => {
+                (StatusCode::BAD_REQUEST, "Invalid payment in lieu token signature encoding")
             }
-            AppError::PaymentInLieuApproval(PaymentInLieuApprovalError::InvalidPaymentInLieuTokenSignature) => {
-                (StatusCode::BAD_REQUEST, "Invalid payment in lieu token signature")
+            Self::PaymentInLieuApproval(ApprovalError::InvalidToken(VerifyTokenError::InvalidSignatureBytes)) => {
+                (StatusCode::BAD_REQUEST, "Invalid payment in lieu token signature bytes")
+            }
+            Self::PaymentInLieuApproval(ApprovalError::InvalidToken(VerifyTokenError::InvalidIssuerEncoding)) => {
+                (StatusCode::BAD_REQUEST, "Invalid payment in lieu token issuer encoding")
+            }
+            Self::PaymentInLieuApproval(ApprovalError::InvalidToken(VerifyTokenError::InvalidIssuerBytes)) => {
+                (StatusCode::BAD_REQUEST, "Invalid payment in lieu token issuer bytes")
+            }
+            Self::PaymentInLieuApproval(ApprovalError::InvalidToken(VerifyTokenError::VerificationFailed)) => {
+                (StatusCode::BAD_REQUEST, "Payment in lieu token signature verification failed")
             }
         };
 
@@ -221,83 +222,30 @@ async fn endorsement_key_handler(
     }))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct PaymentInLieuApprovalBody {
+pub struct PaymentInLieuApprovalBody {
     pub payment_in_lieu_token: PaymentInLieuToken,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct PaymentInLieuToken {
-    pub issuer: String,
-    pub signature: String,
-    pub id: String,
-    pub notional: u64,
-    pub auction_id: u64,
-    pub auction_epoch: u64,
-    pub endorsement: Endorsement,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PaymentInLieuApprovalResponse {
-    pub approver: String,
-    pub approval: String,
-}
-
-async fn payment_in_lieu_approval(
+async fn payment_in_lieu_approval_handler(
     Extension(context): Extension<Arc<ServerContext>>,
     Json(body): Json<PaymentInLieuApprovalBody>,
-) -> Result<Json<PaymentInLieuApprovalResponse>, AppError> {
-    let token = body.payment_in_lieu_token;
-
-    // Check that endorsement is not expired
-    let endorsement = token.endorsement;
+) -> Result<Json<PaymentInLieuApproval>, AppError> {
     let now = seconds_since_epoch();
-    if now > endorsement.expiration_time_utc {
-        return Err(PaymentInLieuApprovalError::EndorsementExpired.into());
-    }
 
-    // Verify the issuer's signature of the payment in lieu message. This is needed to ensure we
-    // don't sign arbitrary payloads.
-    let payment_in_lieu_message = format!(
-        "{},{},{},{},{}",
-        token.id, token.notional, token.auction_id, token.auction_epoch, endorsement.signature,
-    );
-    let payment_in_lieu_message = payment_in_lieu_message.as_bytes();
+    let approval = body.payment_in_lieu_token.approve(
+        &context.endorsement_key,
+        &context.base58_endorsement_key,
+        now,
+    )?;
 
-    let issuer_signature_bytes = base64::engine::general_purpose::STANDARD
-        .decode(&token.signature)
-        .map_err(|_| PaymentInLieuApprovalError::InvalidPaymentInLieuTokenSignature)?;
-    let issuer_signature = ed25519_dalek::Signature::from_bytes(&issuer_signature_bytes)
-        .map_err(|_| PaymentInLieuApprovalError::InvalidPaymentInLieuTokenSignature)?;
-    let issuer_public_key_bytes = bs58::decode(token.issuer.as_bytes())
-        .into_vec()
-        .map_err(|_| PaymentInLieuApprovalError::InvalidPaymentInLieuToken)?;
-    let issuer_public_key = ed25519_dalek::PublicKey::from_bytes(&issuer_public_key_bytes)
-        .map_err(|_| PaymentInLieuApprovalError::InvalidPaymentInLieuToken)?;
-    if issuer_public_key
-        .verify_strict(payment_in_lieu_message, &issuer_signature)
-        .is_err()
-    {
-        return Err(PaymentInLieuApprovalError::InvalidPaymentInLieuTokenSignature.into());
-    }
-
-    // Approve the payment in lieu
-    let approval_message = &issuer_signature_bytes;
-    let approval_signature = context.endorsement_key.sign(approval_message);
-    let approval_signature = base64::engine::general_purpose::STANDARD.encode(approval_signature);
-
-    Ok(Json(PaymentInLieuApprovalResponse {
-        approver: context.base58_endorsement_key.clone(),
-        approval: approval_signature,
-    }))
+    Ok(Json(approval))
 }
 
 fn seconds_since_epoch() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .expect("Duration since failed")
+        .unwrap()
         .as_secs()
 }

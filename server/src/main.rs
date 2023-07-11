@@ -18,6 +18,7 @@ use tokio::{
 
 mod config;
 mod endorsement;
+mod payment_in_lieu;
 mod server;
 
 const DEFAULT_PORT: u16 = 8082;
