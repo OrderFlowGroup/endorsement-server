@@ -68,12 +68,40 @@ jobs:
         with:
           context: ${{ env.DOCKER_BUILD_CONTEXT }}
           platforms: linux/amd64
-          cache-from: type=gha,scope=linux/amd64
+          cache-from: |
+            type=gha,scope=linux/amd64
+            type=gha,scope=linux/amd64-check
+          cache-to: type=gha,mode=max,scope=linux/amd64-check
+          push: false
+          target: check
+
+  check-docker-linux_arm64:
+    # Use the build cache from Docker build
+    needs: build-docker-linux_arm64
+    # Only run on tag push to save time
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@16c0bc4a6e6ada2cfd8afd41d22d95379cf7c32a
+      - name: Run checks on linux/arm64
+        uses: docker/build-push-action@2eb1c1961a95fc15694676618e422e8ba1d63825
+        with:
+          context: ${{ env.DOCKER_BUILD_CONTEXT }}
+          platforms: linux/arm64
+          cache-from: |
+            type=gha,scope=linux/arm64
+            type=gha,scope=linux/arm64-check
+          cache-to: type=gha,mode=max,scope=linux/arm64-check
           push: false
           target: check
 
   publish:
-    needs: [build-docker-linux_amd64, build-docker-linux_arm64, check-docker-linux_amd64]
+    needs: [build-docker-linux_amd64, build-docker-linux_arm64, check-docker-linux_amd64, check-docker-linux_arm64]
     # Only run the publish job on tag push
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
