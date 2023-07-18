@@ -15,11 +15,13 @@ use tokio::{
     signal::unix::{signal, SignalKind},
     sync::oneshot,
 };
+use tracing_subscriber::prelude::*;
 
 mod config;
 mod endorsement;
 mod payment_in_lieu;
 mod server;
+mod trace;
 
 const DEFAULT_PORT: u16 = 8082;
 const EXPIRATION_IN_SECONDS_MIN: u8 = 5;
@@ -30,15 +32,19 @@ const DEFAULT_KEYGEN_PATH: &str = "./endorsementKey.json";
 
 #[tokio::main]
 async fn main() {
-    if env::var("RUST_LOG").is_err() {
-        // Use info log level by default
-        env::set_var("RUST_LOG", "info")
-    }
-    env_logger::init();
-
     let top_command = Cli::parse();
     match top_command.command {
         Commands::Start(args) => {
+            const RUST_LOG_ENV_VAR: &str = "RUST_LOG";
+            if env::var(RUST_LOG_ENV_VAR).is_err() {
+                // Use info log level by default
+                env::set_var(RUST_LOG_ENV_VAR, "info");
+            }
+            tracing_subscriber::registry()
+                .with(tracing_subscriber::EnvFilter::from_env(RUST_LOG_ENV_VAR))
+                .with(tracing_subscriber::fmt::Layer::default().with_ansi(false))
+                .init();
+
             let (server_exit_send, server_exit_recv) = oneshot::channel();
             let (sigint_send, sigint_recv) = oneshot::channel();
             tokio::spawn(async move {
@@ -46,8 +52,10 @@ async fn main() {
                 server_exit_send.send(())
             });
 
-            let mut sigint_stream = signal(SignalKind::interrupt())
-                .unwrap_or_else(|e| log_and_exit(format!("Failed to set up signal handler: {e}")));
+            let mut sigint_stream = signal(SignalKind::interrupt()).unwrap_or_else(|e| {
+                tracing::error!("Failed to set up signal handler: {e}");
+                process::exit(1);
+            });
             tokio::spawn(async move {
                 sigint_stream.recv().await;
                 sigint_send.send(())
@@ -55,10 +63,10 @@ async fn main() {
 
             tokio::select! {
                 _ = server_exit_recv => {
-                    log_and_exit("Failed to start server. Exiting...".to_string());
+                    tracing::error!("Failed to start server. Exiting...");
                 }
                 _ = sigint_recv => {
-                    log::info!("Received SIGINT. Exiting...");
+                    tracing::info!("Received SIGINT. Exiting...");
                 }
             }
         }
@@ -76,19 +84,12 @@ async fn main() {
 }
 
 async fn start(args: StartArgs) {
-    let config = match args.config_path {
-        Some(config_path) => {
-            let yaml_str = fs::read_to_string(&config_path).unwrap_or_else(|e| {
-                log_and_exit(format!("Failed to read config file {config_path}: {e}"))
-            });
-            serde_yaml::from_str::<Config>(&yaml_str)
-                .map(Some)
-                .unwrap_or_else(|e| {
-                    log_and_exit(format!("Failed to parse config file {config_path}: {e}"))
-                })
-        }
-        None => None,
-    };
+    let config = args.config_path.map(|config_path| {
+        Config::read_yaml(&config_path).unwrap_or_else(|e| {
+            tracing::error!(e);
+            process::exit(1);
+        })
+    });
 
     let endorsement_key = args
         .endorsement_key_path
@@ -98,10 +99,15 @@ async fn start(args: StartArgs) {
             env::var("ENDORSEMENT_KEY").map_or(None, |raw| Some(parse_endorsement_key(&raw)))
         })
         .unwrap_or_else(|| {
-            log_and_exit(
-            "Endorsement key not provided via CLI, config file, or ENDORSEMENT_KEY environment \
-            variable. You must specify an endorsement key using one of these methods.".to_string()
-        )
+            tracing::error!(
+                "Endorsement key not provided via CLI, config file, or ENDORSEMENT_KEY environment \
+                variable. You must specify an endorsement key using one of these methods."
+            );
+            process::exit(1);
+        })
+        .unwrap_or_else(|e| {
+            tracing::error!(e);
+            process::exit(1);
         });
 
     let expiration_in_seconds = args
@@ -109,13 +115,15 @@ async fn start(args: StartArgs) {
         .or_else(|| config.clone().and_then(|x| x.expiration_in_seconds))
         .unwrap_or(DEFAULT_EXPIRATION_IN_SECONDS);
     if expiration_in_seconds < EXPIRATION_IN_SECONDS_MIN {
-        log_and_exit(format!(
+        tracing::error!(
             "Endorsement expiration must be at least {EXPIRATION_IN_SECONDS_MIN} seconds"
-        ));
+        );
+        process::exit(1);
     } else if expiration_in_seconds > EXPIRATION_IN_SECONDS_MAX {
-        log_and_exit(format!(
+        tracing::error!(
             "Endorsement expiration must be at most {EXPIRATION_IN_SECONDS_MAX} seconds"
-        ));
+        );
+        process::exit(1);
     }
 
     let disable_payment_in_lieu_approval = args
@@ -156,7 +164,7 @@ async fn start(args: StartArgs) {
 fn key_generate(args: KeyGenerateArgs) {
     let outfile = &args.outfile;
     if Path::new(&outfile).exists() && !args.force {
-        log_and_exit(format!("Refusing to overwrite {outfile} without --force"));
+        print_and_exit(format!("Refusing to overwrite {outfile} without --force"));
     }
     let mut csprng = OsRng {};
     let keypair = Keypair::generate(&mut csprng);
@@ -165,8 +173,9 @@ fn key_generate(args: KeyGenerateArgs) {
     let mut serialized = [0_u8; SECRET_KEY_LENGTH + PUBLIC_KEY_LENGTH];
     serialized[..SECRET_KEY_LENGTH].copy_from_slice(keypair.secret.as_bytes());
     serialized[PUBLIC_KEY_LENGTH..].copy_from_slice(keypair.public.as_bytes());
-    let serialized = serde_json::to_string(serialized.as_ref())
-        .unwrap_or_else(|e| log_and_exit(format!("Failed to serialize endorsement key: {e}")));
+    let serialized = serde_json::to_string(serialized.as_ref()).unwrap_or_else(|e| {
+        print_and_exit(format!("Failed to serialize endorsement key: {e}"));
+    });
     println!("Writing endorsement key to {outfile}");
     let mut file = OpenOptions::new()
         .create(true)
@@ -174,39 +183,41 @@ fn key_generate(args: KeyGenerateArgs) {
         .truncate(true)
         .mode(0o600)
         .open(outfile)
-        .unwrap_or_else(|e| log_and_exit(format!("Failed to open outfile {outfile}: {e}")));
-    file.write_all(serialized.as_bytes())
-        .unwrap_or_else(|e| log_and_exit(format!("Failed to write secret key to {outfile}: {e}")));
+        .unwrap_or_else(|e| {
+            print_and_exit(format!("Failed to open outfile {outfile}: {e}"));
+        });
+    file.write_all(serialized.as_bytes()).unwrap_or_else(|e| {
+        print_and_exit(format!("Failed to write secret key to {outfile}: {e}"));
+    });
 }
 
 fn key_parse(args: KeyParseArgs) {
-    let parsed = read_endorsement_key_from_file(&args.filepath);
+    let parsed = read_endorsement_key_from_file(&args.filepath).unwrap_or_else(|e| {
+        print_and_exit(e);
+    });
     let public_key_base58 = get_base58_public_key(parsed.public);
     println!("{public_key_base58}");
 }
 
-fn log_and_exit(msg: String) -> ! {
-    log::error!("{msg}");
-    process::exit(1)
+fn print_and_exit(error_msg: String) -> ! {
+    println!("{error_msg}");
+    process::exit(1);
 }
 
-fn read_endorsement_key_from_file(path: &str) -> Keypair {
-    let raw_endorsement_key: String = fs::read_to_string(path).unwrap_or_else(|e| {
-        log_and_exit(format!(
-            "Failed to read endorsement key from file {path}. {e}"
-        ))
-    });
+fn read_endorsement_key_from_file(path: &str) -> Result<Keypair, String> {
+    let raw_endorsement_key: String = fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read endorsement key from file {path}. {e}"))?;
     parse_endorsement_key(&raw_endorsement_key)
 }
 
-fn parse_endorsement_key(raw: &str) -> Keypair {
-    let secret_key_bytes: Vec<u8> = serde_json::from_str(raw)
-        .unwrap_or_else(|e| log_and_exit(format!("Failed to parse endorsement key: {e}")));
+fn parse_endorsement_key(raw: &str) -> Result<Keypair, String> {
+    let secret_key_bytes: Vec<u8> =
+        serde_json::from_str(raw).map_err(|e| format!("Failed to parse endorsement key: {e}"))?;
     if secret_key_bytes.len() != 64 {
-        log_and_exit("Invalid endorsement key. Must have length 64.".to_string());
+        return Err("Invalid endorsement key. Must have length 64.".to_owned());
     }
     Keypair::from_bytes(&secret_key_bytes)
-        .unwrap_or_else(|e| log_and_exit(format!("Failed to construct endorsement key: {e}")))
+        .map_err(|e| format!("Failed to construct endorsement key: {e}"))
 }
 
 fn get_base58_public_key(public_key: PublicKey) -> String {

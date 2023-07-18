@@ -176,7 +176,7 @@ pub struct EndorsementParams<'a> {
     pub max_send_qty: Option<&'a str>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EndorsementError {
     InvalidPlatformFeeBps,
     PlatformFeeBpsTooHigh,
@@ -189,7 +189,7 @@ pub enum EndorsementError {
     InvalidMaxSendQty,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum VerifyEndorsementError {
     InvalidSignatureEncoding,
     InvalidSignatureBytes,

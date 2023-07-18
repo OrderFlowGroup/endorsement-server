@@ -150,6 +150,34 @@ server:
         origin: "*"
 ```
 
+#### Log configuration
+By default, the endorsement server logs all requests. Logging can be configured by setting the `RUST_LOG` environment variable. For more info, see https://docs.rs/tracing-subscriber/0.3.17/tracing_subscriber/filter/struct.EnvFilter.html.
+
+##### Log unsuccessful requests only
+```
+RUST_LOG=info,endorsement_server::trace=error
+```
+
+##### Disable request logs
+```
+RUST_LOG=info,endorsement_server::trace=off
+```
+
+##### Log unsuccessful HTTP GET requests only
+```
+RUST_LOG=endorsement_server::trace[request{method=GET}]=error
+```
+
+##### Log requests for URIs beginning with "/endorsement" only
+```
+RUST_LOG=endorsement_server::trace[request{uri="/endorsement.*"}]=info
+```
+
+##### Disable all logs
+```
+RUST_LOG=off
+```
+
 ## Run using Cargo
 While we recommend using Docker to run the endorsement server, it can also be run using Cargo.
 

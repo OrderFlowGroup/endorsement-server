@@ -2,6 +2,7 @@ use crate::{
     config::ServerConfig,
     endorsement::{Endorsement, EndorsementError, EndorsementParams},
     payment_in_lieu::{ApprovalError, PaymentInLieuApproval, PaymentInLieuToken, VerifyTokenError},
+    trace::{trace_error, OnRequestTracingHandler, OnResponseTracingHandler, RequestSpanCreator},
 };
 use axum::{
     extract::{Json, Query},
@@ -10,14 +11,18 @@ use axum::{
     routing::{get, post},
     Extension, Router,
 };
-use hyper::Method;
+use hyper::{http::HeaderName, Method};
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
-use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::{
+    cors::{AllowOrigin, CorsLayer},
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
+    trace::TraceLayer,
+};
 
 extern crate ed25519_dalek;
 extern crate rand;
@@ -38,9 +43,9 @@ pub async fn run_server(context: ServerContext) {
     let server_config = ctx.server.clone();
 
     let host_port = format!("0.0.0.0:{}", ctx.server.port);
-    log::info!("Endorsement server starting on http://{host_port}");
-    log::info!("Endorsement key: {}", &ctx.base58_endorsement_key);
-    log::info!("Endorsement expiration: {}", ctx.expiration_in_seconds);
+    tracing::info!("Endorsement server starting on http://{host_port}");
+    tracing::info!("Endorsement key: {}", &ctx.base58_endorsement_key);
+    tracing::info!("Endorsement expiration: {}", ctx.expiration_in_seconds);
 
     let mut app = Router::new()
         .route("/", get(|| async { "Endorsement server" }))
@@ -70,12 +75,23 @@ pub async fn run_server(context: ServerContext) {
                 .allow_methods(allowed_methods)
                 .allow_origin([parsed_origin])
         };
-        log::info!("CORS origin: {}", cors_config.origin);
+        tracing::info!("CORS origin: {}", cors_config.origin);
         layer
     });
     if cors_layer.is_some() {
         app = app.layer(cors_layer.unwrap());
     }
+
+    let x_request_id = HeaderName::from_static("x-request-id");
+    app = app
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(RequestSpanCreator::new(x_request_id.clone()))
+                .on_request(OnRequestTracingHandler)
+                .on_response(OnResponseTracingHandler),
+        )
+        .layer(PropagateRequestIdLayer::new(x_request_id.clone()))
+        .layer(SetRequestIdLayer::new(x_request_id, MakeRequestUuid));
 
     axum::Server::bind(&host_port.parse().unwrap())
         .serve(app.into_make_service())
@@ -83,6 +99,7 @@ pub async fn run_server(context: ServerContext) {
         .unwrap();
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AppError {
     Endorsement(EndorsementError),
     PaymentInLieuApproval(ApprovalError),
@@ -151,6 +168,8 @@ impl IntoResponse for AppError {
                 (StatusCode::BAD_REQUEST, "Payment in lieu token signature verification failed")
             }
         };
+
+        trace_error(msg);
 
         let body = Json(ErrorResponse {
             msg: String::from(msg),

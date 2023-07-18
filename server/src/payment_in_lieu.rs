@@ -136,7 +136,7 @@ pub struct CreatePaymentInLieuTokenParams<'a> {
     pub endorsement: &'a Endorsement,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum VerifyTokenError {
     InvalidSignatureEncoding,
     InvalidSignatureBytes,
@@ -147,7 +147,7 @@ pub enum VerifyTokenError {
 
 type ApprovalResult = Result<PaymentInLieuApproval, ApprovalError>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ApprovalError {
     EndorsementExpired,
     InvalidToken(VerifyTokenError),
