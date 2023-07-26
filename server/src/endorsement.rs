@@ -14,6 +14,7 @@ pub struct Endorsement {
 }
 
 impl Endorsement {
+    const MAX_PLATFORM_FEE_BPS: u16 = 5000;
     const MAX_ADDITIONAL_DATA_CHAR_LEN: usize = 2000;
 
     /// Create an endorsement signed by the `endorsement_key`.
@@ -32,7 +33,7 @@ impl Endorsement {
         if !platform_fee_bps.is_empty() && !platform_fee_receiver.is_empty() {
             let bps = Self::parse_platform_fee_bps(platform_fee_bps)
                 .map_err(|_| EndorsementError::InvalidPlatformFeeBps)?;
-            if bps > 5000 {
+            if bps > Self::MAX_PLATFORM_FEE_BPS {
                 return Err(EndorsementError::PlatformFeeBpsTooHigh);
             }
             platform_fee_data =
@@ -660,6 +661,33 @@ mod tests {
             },
         );
 
+        let high_platform_fee = Endorsement::MAX_PLATFORM_FEE_BPS.to_string();
+        let endorsement = create_test_endorsement(CreateTestEndorsementParams {
+            endorsement_params: &EndorsementParams {
+                retail_trader: None,
+                platform_fee_bps: Some(&high_platform_fee),
+                platform_fee_receiver: Some("pfr"),
+                send_token: None,
+                receive_token: None,
+                send_qty: None,
+                max_send_qty: None,
+                additional_data: None,
+            },
+            id,
+            expiration_time_utc,
+        });
+        let (endorsement_key, base58_endorsement_key) = get_endorsement_key();
+        check_endorsement(
+            endorsement,
+            ExpectedEndorsement {
+                endorsement_key,
+                endorser_base58_public_key: base58_endorsement_key,
+                id,
+                expiration_time_utc,
+                data: &format!("2||{high_platform_fee},pfr|||||"),
+            },
+        );
+
         let long_additional_data = "a".repeat(Endorsement::MAX_ADDITIONAL_DATA_CHAR_LEN);
         let endorsement = create_test_endorsement(CreateTestEndorsementParams {
             endorsement_params: &EndorsementParams {
@@ -708,7 +736,7 @@ mod tests {
     #[test]
     fn test_create_endorsement_err_platform_fee_bps_too_high() {
         let endorsement = create_test_endorsement2(&EndorsementParams {
-            platform_fee_bps: Some("5001"),
+            platform_fee_bps: Some(&(Endorsement::MAX_PLATFORM_FEE_BPS + 1).to_string()),
             platform_fee_receiver: Some("abc"),
             ..NO_ENDORSEMENT_PARAMS
         });
