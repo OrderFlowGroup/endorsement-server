@@ -148,6 +148,12 @@ impl IntoResponse for AppError {
             Self::Endorsement(EndorsementError::InvalidMaxSendQty) => {
                 (StatusCode::BAD_REQUEST, "Invalid maxSendQty")
             }
+            Self::Endorsement(EndorsementError::InvalidAdditionalDataLength) => {
+                (StatusCode::BAD_REQUEST, "additionalData too long")
+            }
+            Self::Endorsement(EndorsementError::InvalidAdditionalDataChar) => {
+                (StatusCode::BAD_REQUEST, "additionalData contains an invalid character")
+            }
 
             Self::PaymentInLieuApproval(ApprovalError::EndorsementExpired) => {
                 (StatusCode::BAD_REQUEST, "Endorsement expired")
@@ -194,6 +200,7 @@ pub struct EndorsementRequestParams {
     pub receive_token: Option<String>,
     pub send_qty: Option<String>,
     pub max_send_qty: Option<String>,
+    pub additional_data: Option<String>,
 }
 
 type EndorsementResponse = Endorsement;
@@ -214,6 +221,7 @@ async fn endorsement_handler(
         receive_token: params.receive_token.as_deref(),
         send_qty: params.send_qty.as_deref(),
         max_send_qty: params.max_send_qty.as_deref(),
+        additional_data: params.additional_data.as_deref(),
     };
 
     let endorsement = Endorsement::new(

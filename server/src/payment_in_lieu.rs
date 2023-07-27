@@ -371,6 +371,7 @@ mod tests {
                 receive_token: None,
                 send_qty: None,
                 max_send_qty: None,
+                additional_data: None,
             },
             id: 0,
             expiration_time_utc: params.endorsement_expiration_time,
