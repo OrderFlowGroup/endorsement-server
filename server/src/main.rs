@@ -1,15 +1,9 @@
 use clap::{Args, Parser, Subcommand};
 use config::{Config, ServerConfig, ServerCorsConfig};
-use ed25519_dalek::{Keypair, PublicKey, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH};
-use rand::rngs::OsRng;
 use server::{run_server, ServerContext};
+use signatory_client_lib::endorsement_key::EndorsementKey;
 use std::{
-    env,
-    fs::{self, OpenOptions},
-    io::Write,
-    os::unix::prelude::OpenOptionsExt,
-    path::Path,
-    process,
+    env, fs::OpenOptions, io::Write, os::unix::prelude::OpenOptionsExt, path::Path, process,
 };
 use tokio::{
     signal::unix::{signal, SignalKind},
@@ -18,8 +12,6 @@ use tokio::{
 use tracing_subscriber::prelude::*;
 
 mod config;
-mod endorsement;
-mod payment_in_lieu;
 mod server;
 mod trace;
 
@@ -94,9 +86,9 @@ async fn start(args: StartArgs) {
     let endorsement_key = args
         .endorsement_key_path
         .or_else(|| config.clone().and_then(|x| x.endorsement_key_path))
-        .map(|path| read_endorsement_key_from_file(&path))
+        .map(|path| EndorsementKey::from_file(&path))
         .or_else(|| {
-            env::var("ENDORSEMENT_KEY").map_or(None, |raw| Some(parse_endorsement_key(&raw)))
+            env::var("ENDORSEMENT_KEY").map_or(None, |raw| Some(EndorsementKey::from_raw_str(&raw)))
         })
         .unwrap_or_else(|| {
             tracing::error!(
@@ -146,10 +138,8 @@ async fn start(args: StartArgs) {
             .and_then(|c| c.server.and_then(|s| s.cors.map(|sc| sc.origin)))
     });
 
-    let base58_endorsement_key = get_base58_public_key(endorsement_key.public);
     let server_context = ServerContext {
         endorsement_key,
-        base58_endorsement_key,
         expiration_in_seconds,
         disable_payment_in_lieu_approval,
         server: ServerConfig {
@@ -166,15 +156,11 @@ fn key_generate(args: KeyGenerateArgs) {
     if Path::new(&outfile).exists() && !args.force {
         print_and_exit(format!("Refusing to overwrite {outfile} without --force"));
     }
-    let mut csprng = OsRng {};
-    let keypair = Keypair::generate(&mut csprng);
-    let public_key_base58 = get_base58_public_key(keypair.public);
-    println!("Generated endorsement key: {public_key_base58}");
-    let mut serialized = [0_u8; SECRET_KEY_LENGTH + PUBLIC_KEY_LENGTH];
-    serialized[..SECRET_KEY_LENGTH].copy_from_slice(keypair.secret.as_bytes());
-    serialized[PUBLIC_KEY_LENGTH..].copy_from_slice(keypair.public.as_bytes());
-    let serialized = serde_json::to_string(serialized.as_ref()).unwrap_or_else(|e| {
-        print_and_exit(format!("Failed to serialize endorsement key: {e}"));
+    let endorsement_key = EndorsementKey::generate();
+    let base58_public_key = &endorsement_key.base58_public_key;
+    println!("Generated endorsement key: {base58_public_key}");
+    let serialized = endorsement_key.serialize().unwrap_or_else(|e| {
+        print_and_exit(e);
     });
     println!("Writing endorsement key to {outfile}");
     let mut file = OpenOptions::new()
@@ -192,36 +178,15 @@ fn key_generate(args: KeyGenerateArgs) {
 }
 
 fn key_parse(args: KeyParseArgs) {
-    let parsed = read_endorsement_key_from_file(&args.filepath).unwrap_or_else(|e| {
+    let parsed = EndorsementKey::from_file(&args.filepath).unwrap_or_else(|e| {
         print_and_exit(e);
     });
-    let public_key_base58 = get_base58_public_key(parsed.public);
-    println!("{public_key_base58}");
+    println!("{}", parsed.base58_public_key);
 }
 
 fn print_and_exit(error_msg: String) -> ! {
     println!("{error_msg}");
     process::exit(1);
-}
-
-fn read_endorsement_key_from_file(path: &str) -> Result<Keypair, String> {
-    let raw_endorsement_key: String = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read endorsement key from file {path}. {e}"))?;
-    parse_endorsement_key(&raw_endorsement_key)
-}
-
-fn parse_endorsement_key(raw: &str) -> Result<Keypair, String> {
-    let secret_key_bytes: Vec<u8> =
-        serde_json::from_str(raw).map_err(|e| format!("Failed to parse endorsement key: {e}"))?;
-    if secret_key_bytes.len() != 64 {
-        return Err("Invalid endorsement key. Must have length 64.".to_owned());
-    }
-    Keypair::from_bytes(&secret_key_bytes)
-        .map_err(|e| format!("Failed to construct endorsement key: {e}"))
-}
-
-fn get_base58_public_key(public_key: PublicKey) -> String {
-    return bs58::encode(public_key.as_bytes()).into_string();
 }
 
 #[derive(Parser)]
