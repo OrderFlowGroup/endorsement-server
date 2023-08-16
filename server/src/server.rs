@@ -1,7 +1,5 @@
 use crate::{
     config::ServerConfig,
-    endorsement::{Endorsement, EndorsementError, EndorsementParams},
-    payment_in_lieu::{ApprovalError, PaymentInLieuApproval, PaymentInLieuToken, VerifyTokenError},
     trace::{trace_error, OnRequestTracingHandler, OnResponseTracingHandler, RequestSpanCreator},
 };
 use axum::{
@@ -14,6 +12,11 @@ use axum::{
 use hyper::{http::HeaderName, Method};
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
+use signatory_client_lib::{
+    endorsement::{Endorsement, EndorsementError, EndorsementParams},
+    endorsement_key::EndorsementKey,
+    payment_in_lieu::{ApprovalError, PaymentInLieuApproval, PaymentInLieuToken, VerifyTokenError},
+};
 use std::{
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
@@ -24,15 +27,11 @@ use tower_http::{
     trace::TraceLayer,
 };
 
-extern crate ed25519_dalek;
 extern crate rand;
-
-use ed25519_dalek::Keypair;
 
 #[derive(Debug)]
 pub struct ServerContext {
-    pub endorsement_key: Keypair,
-    pub base58_endorsement_key: String,
+    pub endorsement_key: EndorsementKey,
     pub expiration_in_seconds: u8,
     pub disable_payment_in_lieu_approval: bool,
     pub server: ServerConfig,
@@ -44,7 +43,10 @@ pub async fn run_server(context: ServerContext) {
 
     let host_port = format!("0.0.0.0:{}", ctx.server.port);
     tracing::info!("Endorsement server starting on http://{host_port}");
-    tracing::info!("Endorsement key: {}", &ctx.base58_endorsement_key);
+    tracing::info!(
+        "Endorsement key: {}",
+        &ctx.endorsement_key.base58_public_key
+    );
     tracing::info!("Endorsement expiration: {}", ctx.expiration_in_seconds);
 
     let mut app = Router::new()
@@ -227,7 +229,6 @@ async fn endorsement_handler(
     let endorsement = Endorsement::new(
         &endorsement_params,
         &context.endorsement_key,
-        &context.base58_endorsement_key,
         expiration_time_utc,
         id,
     )?;
@@ -245,7 +246,7 @@ async fn endorsement_key_handler(
     Extension(context): Extension<Arc<ServerContext>>,
 ) -> Result<Json<EndorsementKeyResponse>, AppError> {
     Ok(Json(EndorsementKeyResponse {
-        endorsement_key: context.base58_endorsement_key.clone(),
+        endorsement_key: context.endorsement_key.base58_public_key.clone(),
     }))
 }
 
@@ -261,11 +262,9 @@ async fn payment_in_lieu_approval_handler(
 ) -> Result<Json<PaymentInLieuApproval>, AppError> {
     let now = seconds_since_epoch();
 
-    let approval = body.payment_in_lieu_token.approve(
-        &context.endorsement_key,
-        &context.base58_endorsement_key,
-        now,
-    )?;
+    let approval = body
+        .payment_in_lieu_token
+        .approve(&context.endorsement_key, now)?;
 
     Ok(Json(approval))
 }
