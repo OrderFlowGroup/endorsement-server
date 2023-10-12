@@ -1048,9 +1048,9 @@ dependencies = [
 
 [[package]]
 name = "signatory-client-lib"
-version = "1.0.6"
+version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b23d6857474c7e1566a324538a47d6b7aedee27f2402a3e491ed37252591166f"
+checksum = "528e18499c4c330d2be8f417037bb66b2e4d3011730376bddb55204b9d6ae049"
 dependencies = [
  "base64",
  "bs58",
