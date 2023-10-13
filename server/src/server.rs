@@ -10,12 +10,12 @@ use axum::{
     Extension, Router,
 };
 use hyper::{http::HeaderName, Method};
-use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use signatory_client_lib::{
     endorsement::{Endorsement, EndorsementError, EndorsementParams},
     endorsement_key::EndorsementKey,
     payment_in_lieu::{ApprovalError, PaymentInLieuApproval, PaymentInLieuToken, VerifyTokenError},
+    rand::{thread_rng, Rng},
 };
 use std::{
     sync::Arc,
@@ -26,8 +26,6 @@ use tower_http::{
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
     trace::TraceLayer,
 };
-
-extern crate rand;
 
 #[derive(Debug)]
 pub struct ServerContext {
