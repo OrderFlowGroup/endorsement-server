@@ -28,6 +28,10 @@ export const schemaEndorsementRequest = z.object({
      * quantity of the send token. Cannot be specified if the send token is unspecified. Cannot be
      * specified if the send quantity is specified. */
     maxSendQty: z.optional(z.string()),
+    /** Only applies to EVM standard swap endorsements. Address of the proxy contract through which
+     * the retail trader wallet will execute the transaction. Specified if and only if the retail
+     * trader will execute the transaction through a proxy contract. */
+    evmProxyContract: z.optional(z.string()),
     /** Optional additional free-form data to include in the endorsement data. At most 2000
      * characters. Must not contain the pipe character `|`. */
     additionalData: z.optional(z.string().max(2000)),

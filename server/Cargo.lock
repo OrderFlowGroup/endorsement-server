@@ -354,7 +354,7 @@ dependencies = [
 
 [[package]]
 name = "endorsement-server"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "axum",
  "clap",
@@ -1048,9 +1048,9 @@ dependencies = [
 
 [[package]]
 name = "signatory-client-lib"
-version = "1.0.9"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "528e18499c4c330d2be8f417037bb66b2e4d3011730376bddb55204b9d6ae049"
+checksum = "6b1180e3120ffeaf9f27de1e6a7e3c290474c5e94ad03b724c231293fb160f26"
 dependencies = [
  "base64",
  "bs58",

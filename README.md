@@ -46,6 +46,7 @@ You must specify the retail trader's wallet address as a query parameter in your
 | receiveToken | Optional receive token address. If specified, the endorsement can only be used to request a quote where the retail trader receives the specified token. |
 | sendQty | Optional send quantity, specified as a fixed-point number. If specified, if the endorsement can only be used to request a quote where the retail trader sends exactly this quantity of the send token. Cannot be specified if the send token is unspecified. Cannot be specified if the max send quantity is specified. |
 | maxSendQty | Optional maximum send quantity, specified as a fixed-point number. If specified, if the endorsement can only be used to request a quote where the retail trader sends at most this quantity of the send token. Cannot be specified if the send token is unspecified. Cannot be specified if the send quantity is specified. |
+| evmProxyContract | Only applies to EVM standard swap endorsements. Address of the proxy contract through which the retail trader wallet will execute the transaction. Specified if and only if the retail trader will execute the transaction through a proxy contract. |
 | additionalData | Optional additional free-form data to include in the endorsement data. At most 2000 characters. Must not contain the pipe character `\|`. |
 
 ##### cURL

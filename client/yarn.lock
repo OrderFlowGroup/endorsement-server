@@ -2,10 +2,10 @@
 # yarn lockfile v1
 
 
-"@dflow-protocol/signatory-client-lib@^1.0.7":
-  version "1.0.7"
-  resolved "https://registry.yarnpkg.com/@dflow-protocol/signatory-client-lib/-/signatory-client-lib-1.0.7.tgz#aae4424463fcfd199ca847f78a5871d4186580dd"
-  integrity sha512-+rTTQMxpNZ8qWWEj9cQghdJ410u3nz/Qm5rvgZ5IX4JdZ739pUcQplR6b3GjKaFvkybzWUPxanzwf+IzhWI7dQ==
+"@dflow-protocol/signatory-client-lib@^1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@dflow-protocol/signatory-client-lib/-/signatory-client-lib-1.2.0.tgz#469d1dacaa3c9916d06e544dcb90b641ba044f4a"
+  integrity sha512-TLGeJ1tRkjB4U70/bxj29WuoeH9hPyHmq1tTVYxMgsSN2WLOAzM53hyd9jdkd5G7lNmXHuVymjVQl9GiNNhilw==
   dependencies:
     zod "^3.22.4"
 
