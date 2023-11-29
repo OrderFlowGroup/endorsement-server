@@ -200,6 +200,7 @@ pub struct EndorsementRequestParams {
     pub receive_token: Option<String>,
     pub send_qty: Option<String>,
     pub max_send_qty: Option<String>,
+    pub evm_proxy_contract: Option<String>,
     pub additional_data: Option<String>,
 }
 
@@ -221,6 +222,7 @@ async fn endorsement_handler(
         receive_token: params.receive_token.as_deref(),
         send_qty: params.send_qty.as_deref(),
         max_send_qty: params.max_send_qty.as_deref(),
+        evm_proxy_contract: params.evm_proxy_contract.as_deref(),
         additional_data: params.additional_data.as_deref(),
     };
 
